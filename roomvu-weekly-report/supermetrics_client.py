@@ -12,38 +12,38 @@ def _get_api_key():
     return key
 
 
-def fetch(ds_id, account_id, fields, date_range_type="last_year_inc",
+def fetch(ds_id, account_id, fields, date_range_type="this_year",
           start_date=None, end_date=None, settings=None):
     """
     Fetch data from Supermetrics REST API.
     Returns list of dicts keyed by field name.
+    Account IDs are normalised to strip dashes (Google Ads format).
     """
-    payload = {
+    # Google Ads account IDs must have no dashes in API calls
+    clean_account = str(account_id).replace("-", "")
+
+    params = {
         "api_key": _get_api_key(),
         "ds_id": ds_id,
-        "ds_accounts": [account_id],
-        "fields": fields,
         "date_range_type": date_range_type,
     }
     if start_date and end_date:
-        payload["date_range_type"] = "custom"
-        payload["start_date"] = start_date
-        payload["end_date"] = end_date
+        params["date_range_type"] = "custom"
+        params["start_date"] = start_date
+        params["end_date"] = end_date
     if settings:
-        payload.update(settings)
+        params.update(settings)
 
-    # Supermetrics v2 accepts form-encoded POST with PHP-style array keys
-    form_data = {}
-    for k, v in payload.items():
-        if isinstance(v, list):
-            for i, item in enumerate(v):
-                form_data[f"{k}[{i}]"] = item
-        else:
-            form_data[k] = v
+    # Build query string — arrays use repeated keys
+    from urllib.parse import urlencode
+    qs_pairs = list(params.items())
+    qs_pairs.append(("ds_accounts[]", clean_account))
+    for f in fields:
+        qs_pairs.append(("fields[]", f))
 
-    resp = requests.post(SUPERMETRICS_URL, data=form_data, timeout=60)
+    resp = requests.get(SUPERMETRICS_URL, params=qs_pairs, timeout=60)
     if not resp.ok:
-        raise ValueError(f"Supermetrics {resp.status_code}: {resp.text[:500]}")
+        raise ValueError(f"Supermetrics {resp.status_code}: {resp.text[:600]}")
     result = resp.json()
 
     if result.get("meta", {}).get("status") == "error":
