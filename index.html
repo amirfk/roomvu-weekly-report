@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roomvu — Weekly ROI Cohort Report</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- reveal.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+
+  <style>
+    /* ── Brand tokens ─────────────────────────────────────────── */
+    :root {
+      --navy:   #001449;
+      --white:  #ffffff;
+      --gray50: #f8f9fa;
+      --gray200:#e9ecef;
+      --gray600:#6c757d;
+      --font:   'Inter', system-ui, sans-serif;
+    }
+
+    /* ── Base reveal overrides ───────────────────────────────── */
+    .reveal-viewport { background: var(--white); }
+    .reveal          { font-family: var(--font); color: #222; }
+    .reveal .slides  { text-align: left; }
+    .reveal section  { padding: 0 !important; }
+
+    /* ── Slide layout ────────────────────────────────────────── */
+    .slide-wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 28px 40px 20px;
+      box-sizing: border-box;
+    }
+
+    /* ── Slide header bar ─────────────────────────────────────── */
+    .slide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 10px;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+    .slide-header img.logo { height: 32px; object-fit: contain; }
+    .slide-header .report-date { font-size: .72em; color: var(--gray600); }
+
+    /* ── Slide title ─────────────────────────────────────────── */
+    .slide-wrap h2 {
+      font-size: 1.15em;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 0 0 14px;
+      line-height: 1.3;
+    }
+
+    /* ── Title slide ─────────────────────────────────────────── */
+    .title-slide {
+      background: var(--navy);
+      color: var(--white);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      padding: 40px;
+      box-sizing: border-box;
+    }
+    .title-slide img.logo { height: 56px; margin-bottom: 32px; filter: brightness(0) invert(1); }
+    .title-slide h1 { font-size: 1.7em; font-weight: 700; color: var(--white); margin: 0 0 16px; }
+    .title-slide .subtitle { font-size: .9em; color: rgba(255,255,255,.75); }
+
+    /* ── Cohort table ────────────────────────────────────────── */
+    .table-scroll {
+      overflow-x: auto;
+      flex: 1;
+    }
+    table.cohort {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .72em;
+      min-width: 520px;
+    }
+    table.cohort thead tr {
+      background: var(--navy);
+      color: var(--white);
+    }
+    table.cohort thead th {
+      padding: 7px 10px;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    table.cohort thead th.col-left { text-align: left; }
+
+    table.cohort tbody tr:nth-child(even) { background: var(--gray50); }
+    table.cohort tbody tr:hover           { background: var(--gray200); }
+    table.cohort tbody td {
+      padding: 6px 10px;
+      border: 1px solid var(--gray200);
+      text-align: center;
+      white-space: nowrap;
+    }
+    table.cohort tbody td.col-left { text-align: left; }
+
+    /* week-cell shading applied inline via style attr */
+    table.cohort tbody td.week-cell { font-weight: 500; }
+    table.cohort tbody td.week-cell.blank { background: none !important; color: inherit; }
+
+    /* ── Skip / error notice ─────────────────────────────────── */
+    .skip-notice {
+      padding: 24px;
+      background: var(--gray50);
+      border: 1px solid var(--gray200);
+      border-radius: 6px;
+      color: var(--gray600);
+      font-size: .85em;
+    }
+
+    /* ── Print / PDF ─────────────────────────────────────────── */
+    @media print {
+      .reveal .slides { font-size: 11pt; }
+      table.cohort { font-size: 8pt; }
+      .slide-wrap { padding: 16px 24px 12px; }
+      .table-scroll { overflow: visible; }
+      /* Prevent table rows from splitting across pages */
+      table.cohort tbody tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ── Title slide ──────────────────────────────────────── -->
+    <section>
+      <div class="title-slide">
+        <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+        <h1>Roomvu — Weekly ROI Cohort Report</h1>
+        <p class="subtitle">Generated 2026-06-22 11:44 UTC</p>
+      </div>
+    </section>
+
+    <!-- ── Data slides ──────────────────────────────────────── -->
+    
+    <section>
+      <div class="slide-wrap">
+        <div class="slide-header">
+          <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+          <span class="report-date">2026-06-22 11:44 UTC</span>
+        </div>
+        <h2>Meta · Insurance Agents — ROI Cohort (Weekly)</h2>
+
+        
+        <div class="skip-notice">
+          
+            Data unavailable: &#39;float&#39; object has no attribute &#39;replace&#39;
+          
+        </div>
+
+        
+
+      </div>
+    </section>
+    
+    <section>
+      <div class="slide-wrap">
+        <div class="slide-header">
+          <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+          <span class="report-date">2026-06-22 11:44 UTC</span>
+        </div>
+        <h2>Meta · Financial Planners — ROI Cohort (Weekly)</h2>
+
+        
+        <div class="skip-notice">
+          
+            Question ID not configured — add the Metabase question ID to config.yaml.
+          
+        </div>
+
+        
+
+      </div>
+    </section>
+    
+    <section>
+      <div class="slide-wrap">
+        <div class="slide-header">
+          <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+          <span class="report-date">2026-06-22 11:44 UTC</span>
+        </div>
+        <h2>Meta · Realtors — ROI Cohort (Weekly)</h2>
+
+        
+        <div class="skip-notice">
+          
+            Question ID not configured — add the Metabase question ID to config.yaml.
+          
+        </div>
+
+        
+
+      </div>
+    </section>
+    
+    <section>
+      <div class="slide-wrap">
+        <div class="slide-header">
+          <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+          <span class="report-date">2026-06-22 11:44 UTC</span>
+        </div>
+        <h2>Meta · Mortgage Brokers — ROI Cohort (Weekly)</h2>
+
+        
+        <div class="skip-notice">
+          
+            Question ID not configured — add the Metabase question ID to config.yaml.
+          
+        </div>
+
+        
+
+      </div>
+    </section>
+    
+
+  </div><!-- /.slides -->
+</div><!-- /.reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    center: false,
+    margin: 0.04,
+    width: 1280,
+    height: 720,
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    pdfMaxPagesPerSlide: 1,
+    pdfSeparateFragments: false,
+  });
+</script>
+</body>
+</html>
