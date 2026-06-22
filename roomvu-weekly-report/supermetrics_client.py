@@ -32,7 +32,7 @@ def fetch(ds_id, account_id, fields, date_range_type="last_year_inc",
     if settings:
         payload.update(settings)
 
-    resp = requests.post(SUPERMETRICS_URL, json={"json": payload}, timeout=60)
+    resp = requests.post(SUPERMETRICS_URL, json=payload, timeout=60)
     resp.raise_for_status()
     result = resp.json()
 
