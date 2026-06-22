@@ -233,12 +233,12 @@
   </div><!-- /.slides -->
 </div><!-- /.reveal -->
 
-<button id="print-btn" onclick="window.location.href=window.location.pathname+'?print-pdf'">⬇ Export PDF</button>
+<button id="print-btn" onclick="window.location.href=window.location.pathname+'?print-pdf#/'">⬇ Export PDF</button>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
 <script>
-  // Hide print button when already in print-pdf mode
-  if (window.location.search.includes('print-pdf')) {
+  const isPrintMode = window.location.search.includes('print-pdf');
+  if (isPrintMode) {
     document.getElementById('print-btn').style.display = 'none';
   }
 
@@ -253,6 +253,13 @@
     pdfMaxPagesPerSlide: 1,
     pdfSeparateFragments: false,
   });
+
+  // Auto-trigger print dialog when loaded in ?print-pdf mode
+  if (isPrintMode) {
+    Reveal.addEventListener('ready', function() {
+      setTimeout(function() { window.print(); }, 1000);
+    });
+  }
 </script>
 </body>
 </html>
