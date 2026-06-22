@@ -32,8 +32,18 @@ def fetch(ds_id, account_id, fields, date_range_type="last_year_inc",
     if settings:
         payload.update(settings)
 
-    resp = requests.post(SUPERMETRICS_URL, json=payload, timeout=60)
-    resp.raise_for_status()
+    # Supermetrics v2 accepts form-encoded POST with PHP-style array keys
+    form_data = {}
+    for k, v in payload.items():
+        if isinstance(v, list):
+            for i, item in enumerate(v):
+                form_data[f"{k}[{i}]"] = item
+        else:
+            form_data[k] = v
+
+    resp = requests.post(SUPERMETRICS_URL, data=form_data, timeout=60)
+    if not resp.ok:
+        raise ValueError(f"Supermetrics {resp.status_code}: {resp.text[:500]}")
     result = resp.json()
 
     if result.get("meta", {}).get("status") == "error":
