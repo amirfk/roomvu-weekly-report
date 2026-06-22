@@ -36,31 +36,41 @@ def parse_rows(rows: list[dict], fixed_cols: list[str]) -> dict:
         row["week_idx"] = raw.get("week_idx", "")
         row["week"] = raw.get("week", "")
         row["Registration"] = raw.get("Registration", "")
-        # Strip commas from Amount_Spent
+        # Amount_Spent may arrive as a string "6,130" or a numeric 6130.0
         amount_raw = raw.get("Amount_Spent", "")
-        row["Amount_Spent"] = amount_raw.replace(",", "") if amount_raw else ""
-        # Format with thousands separator for display
+        if isinstance(amount_raw, (int, float)):
+            row["Amount_Spent"] = str(int(amount_raw))
+        else:
+            row["Amount_Spent"] = str(amount_raw).replace(",", "") if amount_raw else ""
         try:
             row["Amount_Spent_display"] = f"{int(row['Amount_Spent']):,}"
         except (ValueError, TypeError):
             row["Amount_Spent_display"] = row["Amount_Spent"]
 
-        # Week ROI columns
+        # Week ROI columns — values may be strings "92%" or floats 0.92 / 92.0
         row["week_cells"] = {}
         for col in week_cols:
             raw_val = raw.get(col, "")
             if raw_val == "" or raw_val is None:
                 row["week_cells"][col] = {"text": "", "color": None}
             else:
-                pct_str = str(raw_val).replace("%", "").strip()
-                try:
-                    pct = float(pct_str)
-                    row["week_cells"][col] = {
-                        "text": f"{pct:.0f}%",
-                        "color": _roi_color(pct),
-                    }
-                except ValueError:
-                    row["week_cells"][col] = {"text": raw_val, "color": None}
+                # Numeric: Metabase may send 0.92 (fraction) or 92.0 (percent)
+                if isinstance(raw_val, (int, float)):
+                    pct = float(raw_val)
+                    # Heuristic: values < 5 are almost certainly fractions (0.92 → 92%)
+                    if pct < 5:
+                        pct *= 100
+                else:
+                    pct_str = str(raw_val).replace("%", "").strip()
+                    try:
+                        pct = float(pct_str)
+                    except ValueError:
+                        row["week_cells"][col] = {"text": str(raw_val), "color": None}
+                        continue
+                row["week_cells"][col] = {
+                    "text": f"{pct:.0f}%",
+                    "color": _roi_color(pct),
+                }
 
         parsed.append(row)
 
