@@ -13,15 +13,15 @@ slides:
     title: "Meta · Insurance Agents — ROI Cohort (Weekly)"
     render: cohort_table
   - id: financial_planners_roi
-    metabase_question: 0        # TODO: fill real question id
+    metabase_question: 8271
     title: "Meta · Financial Planners — ROI Cohort (Weekly)"
     render: cohort_table
   - id: realtors_roi
-    metabase_question: 0        # TODO: fill real question id
+    metabase_question: 8279
     title: "Meta · Realtors — ROI Cohort (Weekly)"
     render: cohort_table
   - id: mortgage_roi
-    metabase_question: 0        # TODO: fill real question id
+    metabase_question: 8280
     title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
     render: cohort_table
 
