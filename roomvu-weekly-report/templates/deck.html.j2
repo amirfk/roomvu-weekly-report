@@ -127,6 +127,28 @@
       font-size: .85em;
     }
 
+    /* ── Print button ───────────────────────────────────────── */
+    #print-btn {
+      position: fixed;
+      top: 14px;
+      right: 18px;
+      z-index: 9999;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-family: var(--font);
+      font-size: .78em;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .03em;
+      opacity: .85;
+      transition: opacity .15s;
+    }
+    #print-btn:hover { opacity: 1; }
+    @media print { #print-btn { display: none; } }
+
     /* ── Print / PDF ─────────────────────────────────────────── */
     @media print {
       .reveal .slides { font-size: 11pt; }
@@ -211,8 +233,15 @@
   </div><!-- /.slides -->
 </div><!-- /.reveal -->
 
+<button id="print-btn" onclick="window.location.href=window.location.pathname+'?print-pdf'">⬇ Export PDF</button>
+
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
 <script>
+  // Hide print button when already in print-pdf mode
+  if (window.location.search.includes('print-pdf')) {
+    document.getElementById('print-btn').style.display = 'none';
+  }
+
   Reveal.initialize({
     hash: true,
     center: false,
