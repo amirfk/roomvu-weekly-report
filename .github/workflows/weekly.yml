@@ -31,6 +31,9 @@ jobs:
         env:
           METABASE_URL: ${{ secrets.METABASE_URL }}
           METABASE_API_KEY: ${{ secrets.METABASE_API_KEY }}
+          SUPERMETRICS_API_KEY: ${{ secrets.SUPERMETRICS_API_KEY }}
+          GOOGLE_ADS_ACCOUNT_ID: "459-407-5026"
+          LINKEDIN_ADS_ACCOUNT_ID: "508540143"
         run: python build.py
 
       - name: Commit index.html

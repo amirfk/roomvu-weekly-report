@@ -14,6 +14,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
 
+  <!-- Chart.js for line chart slides -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
   <style>
     /* ── Brand tokens ─────────────────────────────────────────── */
     :root {
@@ -149,6 +152,28 @@
     #print-btn:hover { opacity: 1; }
     @media print { #print-btn { display: none; } }
 
+    /* ── Chart slides ───────────────────────────────────────── */
+    .charts-wrap {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .chart-panel {
+      flex: 1;
+      min-width: 0;
+    }
+    .chart-label {
+      text-align: center;
+      font-size: .75em;
+      color: #888;
+      margin: 0 0 6px;
+      font-weight: 500;
+    }
+    .chart-panel canvas {
+      max-height: 340px;
+    }
+
     /* ── Print / PDF ─────────────────────────────────────────── */
     @media print {
       .reveal .slides { font-size: 11pt; }
@@ -192,7 +217,7 @@
           {% endif %}
         </div>
 
-        {% else %}
+        {% elif slide.render == 'cohort_table' %}
         <div class="table-scroll">
           <table class="cohort">
             <thead>
@@ -224,6 +249,88 @@
             </tbody>
           </table>
         </div>
+
+        {% elif slide.render in ('dual_line_chart', 'line_chart') %}
+        <div class="charts-wrap charts-{{ slide.charts | length }}">
+          {% for chart in slide.charts %}
+          <div class="chart-panel">
+            <p class="chart-label">{{ chart.label }}</p>
+            {% if chart.error is defined %}
+            <div class="skip-notice">{{ chart.error }}</div>
+            {% else %}
+            <canvas id="chart-{{ slide.id | default(loop.index0) }}-{{ loop.index0 }}"></canvas>
+            <script>
+            (function(){
+              var labels = {{ chart.labels | tojson }};
+              var values = {{ chart.values | tojson }};
+              var fmt   = {{ chart.format | tojson }};
+              var color = {{ chart.color | tojson }};
+              var ctx = document.getElementById('chart-{{ slide.id | default(loop.index0) }}-{{ loop.index0 }}');
+              new Chart(ctx, {
+                type: 'line',
+                data: {
+                  labels: labels,
+                  datasets: [{
+                    data: values,
+                    borderColor: color,
+                    backgroundColor: color + '22',
+                    pointBackgroundColor: color,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    borderWidth: 2,
+                    tension: 0.1,
+                    fill: false,
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  animation: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: function(ctx) {
+                          var v = ctx.parsed.y;
+                          if (fmt === 'currency') return '$' + v.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+                          if (fmt === 'percent') return v.toFixed(1) + '%';
+                          return v.toLocaleString('en-US');
+                        }
+                      }
+                    },
+                    datalabels: { display: false }
+                  },
+                  scales: {
+                    x: {
+                      ticks: {
+                        font: { size: 9, family: 'Inter' },
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 20,
+                      },
+                      grid: { color: '#eee' }
+                    },
+                    y: {
+                      ticks: {
+                        font: { size: 9, family: 'Inter' },
+                        callback: function(v) {
+                          if (fmt === 'currency') return '$' + v.toLocaleString('en-US');
+                          if (fmt === 'percent') return v + '%';
+                          return v.toLocaleString('en-US');
+                        }
+                      },
+                      grid: { color: '#eee' }
+                    }
+                  }
+                }
+              });
+            })();
+            </script>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
         {% endif %}
 
       </div>

@@ -1,6 +1,9 @@
 # ai_analysis is a FUTURE slide property — not implemented in v1.
 metabase_url_env: METABASE_URL
 metabase_api_key_env: METABASE_API_KEY
+supermetrics_api_key_env: SUPERMETRICS_API_KEY
+google_ads_account_id: "459-407-5026"
+linkedin_ads_account_id: "508540143"
 
 deck:
   title: "Roomvu — Weekly ROI Cohort Report"
@@ -24,5 +27,26 @@ slides:
     metabase_question: 8280
     title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
     render: cohort_table
+
+  # ── Google Ads slides (Supermetrics) ───────────────────────────
+  - id: google_all_campaigns
+    title: "Google - All campaigns"
+    render: dual_line_chart
+    platform_icon: google
+    charts:
+      - label: "Google Total Spending"
+        source: google_ads
+        fields: [Yearweekiso, Cost]
+        x_field: Yearweekiso
+        y_field: Cost
+        format: currency
+        color: "#4A90D9"
+      - label: "Google CPA"
+        source: google_ads
+        fields: [Yearweekiso, CostPerConversion]
+        x_field: Yearweekiso
+        y_field: CostPerConversion
+        format: currency
+        color: "#4A90D9"
 
 fixed_columns: [week_idx, week, Registration, Amount_Spent]

@@ -1,4 +1,5 @@
-"""Build the Roomvu weekly ROI cohort reveal.js deck."""
+"""Build the Roomvu weekly acquisition & ROI cohort reveal.js deck."""
+import os
 import sys
 import datetime
 import yaml
@@ -6,7 +7,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from metabase_client import fetch_question
-
+import supermetrics_client as sm
 
 ROOT = Path(__file__).parent
 OUTPUT = ROOT.parent / "index.html"  # served from repo root by GitHub Pages
@@ -17,26 +18,36 @@ def load_config():
         return yaml.safe_load(f)
 
 
-def parse_rows(rows: list[dict], fixed_cols: list[str]) -> dict:
-    """
-    Returns:
-      week_cols: list of week column names (in original key order)
-      parsed:    list of row dicts with typed values + shading info per week cell
-    """
+# ── Metabase / cohort table ───────────────────────────────────────────────────
+
+def _roi_color(pct: float) -> str:
+    clamped = max(0.0, min(150.0, pct))
+    break_even = 100.0
+    if clamped <= break_even:
+        t = clamped / break_even
+        r = 220
+        g = int(20 + t * (220 - 20))
+        b = int(20 + t * (180 - 20))
+    else:
+        t = (clamped - break_even) / (150.0 - break_even)
+        r = int(220 - t * (220 - 20))
+        g = 210
+        b = int(180 + t * (20 - 180))
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+    text = "#111" if lum > 140 else "#fff"
+    return f"background:rgb({r},{g},{b});color:{text}"
+
+
+def parse_cohort_rows(rows: list, fixed_cols: list) -> dict:
     if not rows:
         return {"week_cols": [], "parsed": []}
-
-    # Detect week columns from first row, preserving insertion order
     week_cols = [k for k in rows[0].keys() if k not in fixed_cols]
-
     parsed = []
     for raw in rows:
         row = {}
-        # Fixed columns
         row["week_idx"] = raw.get("week_idx", "")
         row["week"] = raw.get("week", "")
         row["Registration"] = raw.get("Registration", "")
-        # Amount_Spent may arrive as a string "6,130" or a numeric 6130.0
         amount_raw = raw.get("Amount_Spent", "")
         if isinstance(amount_raw, (int, float)):
             row["Amount_Spent"] = str(int(amount_raw))
@@ -47,17 +58,14 @@ def parse_rows(rows: list[dict], fixed_cols: list[str]) -> dict:
         except (ValueError, TypeError):
             row["Amount_Spent_display"] = row["Amount_Spent"]
 
-        # Week ROI columns — values may be strings "92%" or floats 0.92 / 92.0
         row["week_cells"] = {}
         for col in week_cols:
             raw_val = raw.get(col, "")
             if raw_val == "" or raw_val is None:
                 row["week_cells"][col] = {"text": "", "color": None}
             else:
-                # Numeric: Metabase may send 0.92 (fraction) or 92.0 (percent)
                 if isinstance(raw_val, (int, float)):
                     pct = float(raw_val)
-                    # Heuristic: values < 5 are almost certainly fractions (0.92 → 92%)
                     if pct < 5:
                         pct *= 100
                 else:
@@ -67,44 +75,103 @@ def parse_rows(rows: list[dict], fixed_cols: list[str]) -> dict:
                     except ValueError:
                         row["week_cells"][col] = {"text": str(raw_val), "color": None}
                         continue
-                row["week_cells"][col] = {
-                    "text": f"{pct:.0f}%",
-                    "color": _roi_color(pct),
-                }
-
+                row["week_cells"][col] = {"text": f"{pct:.0f}%", "color": _roi_color(pct)}
         parsed.append(row)
-
     return {"week_cols": week_cols, "parsed": parsed}
 
 
-def _roi_color(pct: float) -> str:
-    """Map a ROI % to an RGB hex color. Blank cells are handled by callers."""
-    # Clamp to [0, 150]
-    clamped = max(0.0, min(150.0, pct))
-    break_even = 100.0
+def build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols):
+    qid = slide_cfg.get("metabase_question", 0)
+    title = slide_cfg["title"]
+    if not qid:
+        print(f"  [SKIP] '{title}' — question_id not set")
+        return {"title": title, "render": "cohort_table", "skipped": True}
+    rows = fetch_question(qid, url_env, key_env)
+    table = parse_cohort_rows(rows, fixed_cols)
+    print(f"  [OK]   '{title}' — {len(table['parsed'])} rows, cols: {table['week_cols']}")
+    return {
+        "title": title,
+        "render": "cohort_table",
+        "skipped": False,
+        "week_cols": table["week_cols"],
+        "rows": table["parsed"],
+    }
 
-    if clamped <= break_even:
-        # 0% → full red, 100% → neutral yellow
-        t = clamped / break_even          # 0..1
-        r = 220
-        g = int(20 + t * (220 - 20))     # 20 → 220
-        b = int(20 + t * (180 - 20))     # 20 → 180
+
+# ── Supermetrics / chart slides ───────────────────────────────────────────────
+
+def _fetch_chart_data(chart_cfg):
+    """Fetch one chart's data from Supermetrics. Returns (labels, values)."""
+    source = chart_cfg["source"]
+    fields = chart_cfg["fields"]      # e.g. ["Yearweekiso", "Cost"]
+    x_field = chart_cfg["x_field"]
+    y_field = chart_cfg["y_field"]
+
+    if source == "google_ads":
+        rows = sm.fetch_google_ads(fields, date_range_type="last_year_inc")
+    elif source == "linkedin_ads":
+        rows = sm.fetch_linkedin_ads(fields, date_range_type="last_year_inc")
     else:
-        # 100% → neutral yellow, 150% → full green
-        t = (clamped - break_even) / (150.0 - break_even)  # 0..1
-        r = int(220 - t * (220 - 20))    # 220 → 20
-        g = 210
-        b = int(180 + t * (20 - 180))    # 180 → 20
+        raise ValueError(f"Unknown chart source: {source}")
 
-    # Choose text color for legibility (simple luminance check)
-    lum = 0.299 * r + 0.587 * g + 0.114 * b
-    text = "#111" if lum > 140 else "#fff"
-    return f"background:{_rgb(r,g,b)};color:{text}"
+    labels = []
+    values = []
+    for row in rows:
+        raw_x = row.get(x_field, "")
+        raw_y = row.get(y_field, 0)
+        # Format week label
+        if "-W" in str(raw_x):
+            labels.append(sm.format_week_label(str(raw_x)))
+        else:
+            labels.append(str(raw_x))
+        # Numeric value
+        try:
+            values.append(round(float(raw_y), 2))
+        except (TypeError, ValueError):
+            values.append(0)
+
+    return labels, values
 
 
-def _rgb(r, g, b):
-    return f"rgb({r},{g},{b})"
+def build_chart_slide(slide_cfg):
+    title = slide_cfg["title"]
+    render = slide_cfg.get("render", "dual_line_chart")
+    charts_cfg = slide_cfg.get("charts", [])
+    platform_icon = slide_cfg.get("platform_icon", "")
 
+    charts_data = []
+    for chart_cfg in charts_cfg:
+        try:
+            labels, values = _fetch_chart_data(chart_cfg)
+            charts_data.append({
+                "label": chart_cfg["label"],
+                "labels": labels,
+                "values": values,
+                "format": chart_cfg.get("format", "number"),
+                "color": chart_cfg.get("color", "#4A90D9"),
+            })
+            print(f"  [OK]   '{title}' chart '{chart_cfg['label']}' — {len(values)} points")
+        except Exception as exc:
+            print(f"  [ERR]  '{title}' chart '{chart_cfg['label']}' — {exc}", file=sys.stderr)
+            charts_data.append({
+                "label": chart_cfg["label"],
+                "labels": [],
+                "values": [],
+                "format": chart_cfg.get("format", "number"),
+                "color": chart_cfg.get("color", "#4A90D9"),
+                "error": str(exc),
+            })
+
+    return {
+        "title": title,
+        "render": render,
+        "platform_icon": platform_icon,
+        "skipped": False,
+        "charts": charts_data,
+    }
+
+
+# ── Main build ────────────────────────────────────────────────────────────────
 
 def build():
     cfg = load_config()
@@ -112,32 +179,28 @@ def build():
     key_env = cfg["metabase_api_key_env"]
     fixed_cols = cfg["fixed_columns"]
 
+    # Pass account IDs to env so supermetrics_client picks them up
+    os.environ.setdefault("GOOGLE_ADS_ACCOUNT_ID", str(cfg.get("google_ads_account_id", "")))
+    os.environ.setdefault("LINKEDIN_ADS_ACCOUNT_ID", str(cfg.get("linkedin_ads_account_id", "")))
+
     env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=True)
     tmpl = env.get_template("deck.html.j2")
 
     slides_data = []
     for slide_cfg in cfg["slides"]:
-        qid = slide_cfg["metabase_question"]
-        title = slide_cfg["title"]
-        if not qid:
-            print(f"  [SKIP] '{title}' — question_id is 0, set it in config.yaml")
-            slides_data.append({"title": title, "skipped": True})
-            continue
+        render = slide_cfg.get("render", "cohort_table")
         try:
-            rows = fetch_question(qid, url_env, key_env)
-            table = parse_rows(rows, fixed_cols)
-            slides_data.append({
-                "title": title,
-                "skipped": False,
-                "week_cols": table["week_cols"],
-                "rows": table["parsed"],
-                "row_count": len(table["parsed"]),
-            })
-            print(f"  [OK]   '{title}' — {len(table['parsed'])} rows, "
-                  f"week cols: {table['week_cols']}")
+            if render == "cohort_table":
+                slides_data.append(build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols))
+            elif render in ("dual_line_chart", "line_chart"):
+                slides_data.append(build_chart_slide(slide_cfg))
+            else:
+                print(f"  [SKIP] Unknown render type '{render}'")
+                slides_data.append({"title": slide_cfg.get("title", "?"), "skipped": True})
         except Exception as exc:
+            title = slide_cfg.get("title", "?")
             print(f"  [ERR]  '{title}' — {exc}", file=sys.stderr)
-            slides_data.append({"title": title, "skipped": True, "error": str(exc)})
+            slides_data.append({"title": title, "render": render, "skipped": True, "error": str(exc)})
 
     generated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     html = tmpl.render(
@@ -148,9 +211,9 @@ def build():
     )
 
     OUTPUT.write_text(html, encoding="utf-8")
-    print(f"\nWrote {OUTPUT}")
     built = sum(1 for s in slides_data if not s.get("skipped"))
     skipped = len(slides_data) - built
+    print(f"\nWrote {OUTPUT}")
     print(f"Build summary: {built} slide(s) built, {skipped} skipped.")
 
 
