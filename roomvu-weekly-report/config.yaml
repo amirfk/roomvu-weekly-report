@@ -1,0 +1,28 @@
+# ai_analysis is a FUTURE slide property — not implemented in v1.
+metabase_url_env: METABASE_URL
+metabase_api_key_env: METABASE_API_KEY
+
+deck:
+  title: "Roomvu — Weekly ROI Cohort Report"
+  shade_scale: [0, 150]        # % clamp range for cell color
+  break_even: 100              # % anchor for red/green split
+
+slides:
+  - id: insurance_roi
+    metabase_question: 8268
+    title: "Meta · Insurance Agents — ROI Cohort (Weekly)"
+    render: cohort_table
+  - id: financial_planners_roi
+    metabase_question: 0        # TODO: fill real question id
+    title: "Meta · Financial Planners — ROI Cohort (Weekly)"
+    render: cohort_table
+  - id: realtors_roi
+    metabase_question: 0        # TODO: fill real question id
+    title: "Meta · Realtors — ROI Cohort (Weekly)"
+    render: cohort_table
+  - id: mortgage_roi
+    metabase_question: 0        # TODO: fill real question id
+    title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
+    render: cohort_table
+
+fixed_columns: [week_idx, week, Registration, Amount_Spent]
