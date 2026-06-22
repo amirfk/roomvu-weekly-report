@@ -127,6 +127,28 @@
       font-size: .85em;
     }
 
+    /* ── Print button ───────────────────────────────────────── */
+    #print-btn {
+      position: fixed;
+      top: 14px;
+      right: 18px;
+      z-index: 9999;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-family: var(--font);
+      font-size: .78em;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .03em;
+      opacity: .85;
+      transition: opacity .15s;
+    }
+    #print-btn:hover { opacity: 1; }
+    @media print { #print-btn { display: none; } }
+
     /* ── Print / PDF ─────────────────────────────────────────── */
     @media print {
       .reveal .slides { font-size: 11pt; }
@@ -147,7 +169,7 @@
       <div class="title-slide">
         <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
         <h1>Roomvu — Weekly ROI Cohort Report</h1>
-        <p class="subtitle">Generated 2026-06-22 11:55 UTC</p>
+        <p class="subtitle">Generated 2026-06-22 12:13 UTC</p>
       </div>
     </section>
 
@@ -157,7 +179,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-22 11:55 UTC</span>
+          <span class="report-date">2026-06-22 12:13 UTC</span>
         </div>
         <h2>Meta · Insurance Agents — ROI Cohort (Weekly)</h2>
 
@@ -356,7 +378,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-22 11:55 UTC</span>
+          <span class="report-date">2026-06-22 12:13 UTC</span>
         </div>
         <h2>Meta · Financial Planners — ROI Cohort (Weekly)</h2>
 
@@ -555,7 +577,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-22 11:55 UTC</span>
+          <span class="report-date">2026-06-22 12:13 UTC</span>
         </div>
         <h2>Meta · Realtors — ROI Cohort (Weekly)</h2>
 
@@ -754,7 +776,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-22 11:55 UTC</span>
+          <span class="report-date">2026-06-22 12:13 UTC</span>
         </div>
         <h2>Meta · Mortgage Brokers — ROI Cohort (Weekly)</h2>
 
@@ -953,8 +975,15 @@
   </div><!-- /.slides -->
 </div><!-- /.reveal -->
 
+<button id="print-btn" onclick="window.location.href=window.location.pathname+'?print-pdf#/'">⬇ Export PDF</button>
+
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
 <script>
+  const isPrintMode = window.location.search.includes('print-pdf');
+  if (isPrintMode) {
+    document.getElementById('print-btn').style.display = 'none';
+  }
+
   Reveal.initialize({
     hash: true,
     center: false,
@@ -966,6 +995,13 @@
     pdfMaxPagesPerSlide: 1,
     pdfSeparateFragments: false,
   });
+
+  // Auto-trigger print dialog when loaded in ?print-pdf mode
+  if (isPrintMode) {
+    Reveal.addEventListener('ready', function() {
+      setTimeout(function() { window.print(); }, 1000);
+    });
+  }
 </script>
 </body>
 </html>
