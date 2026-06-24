@@ -98,6 +98,86 @@ def build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols):
     }
 
 
+# ── Meta KPI slides ──────────────────────────────────────────────────────────
+
+def _first_row(rows: list) -> dict:
+    return rows[0] if rows else {}
+
+
+def _fmt_currency(val) -> str:
+    try:
+        return f"${int(round(float(val))):,}"
+    except (TypeError, ValueError):
+        return str(val) if val is not None else "—"
+
+
+def _fmt_number(val) -> str:
+    try:
+        return f"{int(round(float(val))):,}"
+    except (TypeError, ValueError):
+        return str(val) if val is not None else "—"
+
+
+def build_meta_kpi_slide(slide_cfg, url_env, key_env):
+    title = slide_cfg["title"]
+    qid_reg = slide_cfg.get("metabase_question_registrations", 0)
+    qid_spend = slide_cfg.get("metabase_question_spend", 0)
+
+    reg_row = {}
+    spend_row = {}
+    errors = []
+
+    if qid_reg:
+        try:
+            reg_row = _first_row(fetch_question(qid_reg, url_env, key_env))
+        except Exception as exc:
+            errors.append(f"registrations: {exc}")
+    if qid_spend:
+        try:
+            spend_row = _first_row(fetch_question(qid_spend, url_env, key_env))
+        except Exception as exc:
+            errors.append(f"spend: {exc}")
+
+    merged = {**reg_row, **spend_row}
+
+    def pick(d, *keys):
+        for k in keys:
+            if k in d:
+                return d[k]
+        return None
+
+    registrations = pick(merged, "Registrations", "registrations", "Registration", "Count")
+    cost          = pick(merged, "Cost", "cost", "Amount_Spent", "Spend")
+    cpa           = pick(merged, "CPA", "cpa", "Cost_Per_Acquisition")
+    subscriptions = pick(merged, "Subscriptions", "subscriptions", "Subscription")
+    revenue       = pick(merged, "Im. Revenue", "Im_Revenue", "Revenue", "revenue")
+
+    if cpa is None and registrations and cost:
+        try:
+            cpa = round(float(cost) / float(registrations), 2)
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+
+    kpis = [
+        {"label": "Registrations", "value": _fmt_number(registrations)},
+        {"label": "Cost",          "value": _fmt_currency(cost)},
+        {"label": "CPA",           "value": _fmt_currency(cpa)},
+        {"label": "Subscriptions", "value": _fmt_number(subscriptions)},
+        {"label": "Im. Revenue",   "value": _fmt_currency(revenue)},
+    ]
+
+    print(f"  [OK]   '{title}' — KPIs: {kpis}")
+    return {
+        "title": title,
+        "render": "meta_kpi",
+        "platform": slide_cfg.get("platform", "meta"),
+        "creative_url": slide_cfg.get("creative_url", ""),
+        "kpis": kpis,
+        "skipped": False,
+        "error": "; ".join(errors) if errors else None,
+    }
+
+
 # ── Supermetrics / chart slides ───────────────────────────────────────────────
 
 def _fetch_chart_data(chart_cfg):
@@ -192,6 +272,8 @@ def build():
         try:
             if render == "cohort_table":
                 slides_data.append(build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols))
+            elif render == "meta_kpi":
+                slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render in ("dual_line_chart", "line_chart"):
                 slides_data.append(build_chart_slide(slide_cfg))
             else:
