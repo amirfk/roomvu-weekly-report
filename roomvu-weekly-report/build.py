@@ -150,7 +150,7 @@ def build_meta_kpi_slide(slide_cfg, url_env, key_env):
     cost          = pick(merged, "Cost", "cost", "Amount_Spent", "Spend")
     cpa           = pick(merged, "CPA", "cpa", "Cost_Per_Acquisition")
     subscriptions = pick(merged, "Subscriptions", "subscriptions", "Subscription")
-    revenue       = pick(merged, "Im. Revenue", "Im_Revenue", "Revenue", "revenue")
+    revenue       = pick(merged, "Immediate_Revenue", "Im. Revenue", "Im_Revenue", "Revenue", "revenue")
 
     if cpa is None and registrations and cost:
         try:
