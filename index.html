@@ -152,6 +152,70 @@
     #print-btn:hover { opacity: 1; }
     @media print { #print-btn { display: none; } }
 
+    /* ── Meta KPI slide ─────────────────────────────────────── */
+    .kpi-wrap {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+      flex: 1;
+    }
+    .kpi-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      justify-content: center;
+    }
+    .kpi-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      border-bottom: 1px solid var(--gray200);
+      padding-bottom: 14px;
+    }
+    .kpi-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .kpi-label {
+      font-size: .85em;
+      color: var(--gray600);
+      min-width: 140px;
+      font-weight: 500;
+    }
+    .kpi-value {
+      font-size: 1.6em;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .kpi-creative {
+      width: 280px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--gray200);
+      background: var(--gray50);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 260px;
+    }
+    .kpi-creative img { width: 100%; height: auto; display: block; }
+    .kpi-creative .no-creative {
+      color: var(--gray600);
+      font-size: .8em;
+      padding: 20px;
+      text-align: center;
+    }
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .78em;
+      font-weight: 700;
+      color: #1877F2;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
     /* ── Chart slides ───────────────────────────────────────── */
     .charts-wrap {
       display: flex;
@@ -194,7 +258,7 @@
       <div class="title-slide">
         <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
         <h1>Roomvu — Weekly ROI Cohort Report</h1>
-        <p class="subtitle">Generated 2026-06-24 09:21 UTC</p>
+        <p class="subtitle">Generated 2026-06-24 18:03 UTC</p>
       </div>
     </section>
 
@@ -204,7 +268,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-24 09:21 UTC</span>
+          <span class="report-date">2026-06-24 18:03 UTC</span>
         </div>
         <h2>Meta · Insurance Agents — ROI Cohort (Weekly)</h2>
 
@@ -362,7 +426,7 @@
               <tr>
                 <td class="col-left">17 Jun - 23 Jun</td>
                 <td>334</td>
-                <td>$6,429</td>
+                <td>$6,430</td>
                 
                   
                   
@@ -404,7 +468,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-24 09:21 UTC</span>
+          <span class="report-date">2026-06-24 18:03 UTC</span>
         </div>
         <h2>Meta · Financial Planners — ROI Cohort (Weekly)</h2>
 
@@ -604,7 +668,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-24 09:21 UTC</span>
+          <span class="report-date">2026-06-24 18:03 UTC</span>
         </div>
         <h2>Meta · Realtors — ROI Cohort (Weekly)</h2>
 
@@ -804,7 +868,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-24 09:21 UTC</span>
+          <span class="report-date">2026-06-24 18:03 UTC</span>
         </div>
         <h2>Meta · Mortgage Brokers — ROI Cohort (Weekly)</h2>
 
@@ -1004,7 +1068,61 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-24 09:21 UTC</span>
+          <span class="report-date">2026-06-24 18:03 UTC</span>
+        </div>
+        <h2>Meta - Insurance Agents Registration</h2>
+
+        
+        <div class="platform-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.269h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+          Meta
+        </div>
+        <div class="kpi-wrap">
+          <div class="kpi-left">
+            
+            <div class="kpi-row">
+              <span class="kpi-label">Registrations:</span>
+              <span class="kpi-value">334</span>
+            </div>
+            
+            <div class="kpi-row">
+              <span class="kpi-label">Cost:</span>
+              <span class="kpi-value">$6,430</span>
+            </div>
+            
+            <div class="kpi-row">
+              <span class="kpi-label">CPA:</span>
+              <span class="kpi-value">$19</span>
+            </div>
+            
+            <div class="kpi-row">
+              <span class="kpi-label">Subscriptions:</span>
+              <span class="kpi-value">3</span>
+            </div>
+            
+            <div class="kpi-row">
+              <span class="kpi-label">Im. Revenue:</span>
+              <span class="kpi-value">—</span>
+            </div>
+            
+          </div>
+          <div class="kpi-creative">
+            
+            <span class="no-creative">No creative configured</span>
+            
+          </div>
+        </div>
+
+        
+
+      </div>
+    </section>
+    
+    <section>
+      <div class="slide-wrap">
+        <div class="slide-header">
+          <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
+          <span class="report-date">2026-06-24 18:03 UTC</span>
         </div>
         <h2>Google - All campaigns</h2>
 
