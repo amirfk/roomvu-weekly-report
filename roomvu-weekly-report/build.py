@@ -166,12 +166,19 @@ def build_meta_kpi_slide(slide_cfg, url_env, key_env):
         {"label": "Im. Revenue",   "value": _fmt_currency(revenue)},
     ]
 
+    # Resolve creative: prefer explicit URL, fall back to file in assets/creatives/
+    creative_url = slide_cfg.get("creative_url", "")
+    if not creative_url:
+        creative_file = slide_cfg.get("creative_file", "")
+        if creative_file:
+            creative_url = f"roomvu-weekly-report/assets/creatives/{creative_file}"
+
     print(f"  [OK]   '{title}' — KPIs: {kpis}")
     return {
         "title": title,
         "render": "meta_kpi",
         "platform": slide_cfg.get("platform", "meta"),
-        "creative_url": slide_cfg.get("creative_url", ""),
+        "creative_url": creative_url,
         "kpis": kpis,
         "skipped": False,
         "error": "; ".join(errors) if errors else None,

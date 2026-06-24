@@ -35,7 +35,7 @@ slides:
     platform: meta
     metabase_question_registrations: 8330
     metabase_question_spend: 8331
-    creative_url: ""
+    creative_file: "insurance.jpg"   # filename inside roomvu-weekly-report/assets/creatives/
 
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
