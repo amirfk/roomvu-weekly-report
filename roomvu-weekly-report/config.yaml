@@ -79,6 +79,19 @@ slides:
         format: currency
         color: "#6B7FD4"
 
+  - id: meta_realestate_sub_rate
+    title: "Meta - Real Estate & MB Subscription Rate"
+    render: line_chart
+    platform: meta
+    charts:
+      - label: "Subscription Rate"
+        source: metabase
+        metabase_question: 8340
+        x_field: week
+        y_field: subscription_rate
+        format: percent
+        color: "#6B7FD4"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
