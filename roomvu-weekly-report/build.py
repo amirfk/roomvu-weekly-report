@@ -191,7 +191,7 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     """Fetch one chart's data. Returns (labels, values)."""
     source = chart_cfg["source"]
     x_field = chart_cfg["x_field"]
-    y_field = chart_cfg["y_field"]
+    y_field = chart_cfg.get("y_field", "")
 
     if source == "metabase_ratio":
         # Fetch two questions, join on join_field, compute numerator/denominator * 100
@@ -273,15 +273,17 @@ def build_chart_slide(slide_cfg, url_env=None, key_env=None):
             charts_data.append({
                 "label": chart_cfg["label"],
                 "labels": [],
-                "values": [],
+                "data": [],
                 "format": chart_cfg.get("format", "number"),
                 "color": chart_cfg.get("color", "#4A90D9"),
                 "error": str(exc),
             })
 
     return {
+        "id": slide_cfg.get("id", ""),
         "title": title,
         "render": render,
+        "platform": slide_cfg.get("platform", ""),
         "platform_icon": platform_icon,
         "skipped": False,
         "charts": charts_data,
