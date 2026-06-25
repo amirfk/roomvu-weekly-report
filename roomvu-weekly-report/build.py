@@ -193,10 +193,35 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     x_field = chart_cfg["x_field"]
     y_field = chart_cfg["y_field"]
 
-    if source == "metabase":
+    if source == "metabase_ratio":
+        # Fetch two questions, join on join_field, compute numerator/denominator * 100
+        num_rows = fetch_question(chart_cfg["metabase_question_numerator"], url_env, key_env)
+        den_rows = fetch_question(chart_cfg["metabase_question_denominator"], url_env, key_env)
+        join_field = chart_cfg.get("join_field", "week_idx")
+        num_field  = chart_cfg["numerator_field"]
+        den_field  = chart_cfg["denominator_field"]
+
+        den_map = {str(r.get(join_field)): r for r in den_rows}
+        labels = []
+        values = []
+        for row in num_rows:
+            key = str(row.get(join_field))
+            den_row = den_map.get(key)
+            if den_row is None:
+                continue
+            raw_x = row.get(x_field, "")
+            try:
+                ratio = float(row[num_field]) / float(den_row[den_field]) * 100
+                ratio = round(ratio, 2)
+            except (TypeError, ValueError, ZeroDivisionError):
+                ratio = 0
+            labels.append(str(raw_x))
+            values.append(ratio)
+        return labels, values
+
+    elif source == "metabase":
         qid = chart_cfg["metabase_question"]
         rows = fetch_question(qid, url_env, key_env)
-        # rows already keyed by column name
     else:
         fields = chart_cfg["fields"]
         if source == "google_ads":

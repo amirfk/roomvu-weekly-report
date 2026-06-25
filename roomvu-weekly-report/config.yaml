@@ -92,6 +92,22 @@ slides:
         format: percent
         color: "#6B7FD4"
 
+  - id: meta_total_return_rate
+    title: "Meta - Total Return Rate (MB + Realtor)"
+    render: line_chart
+    platform: meta
+    charts:
+      - label: "Total Return Rate"
+        source: metabase_ratio
+        metabase_question_numerator: 8341
+        metabase_question_denominator: 8342
+        join_field: week_idx
+        x_field: week
+        numerator_field: total_revenue
+        denominator_field: spend
+        format: percent
+        color: "#4A90D9"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
