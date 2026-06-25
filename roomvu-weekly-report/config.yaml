@@ -134,6 +134,26 @@ slides:
         format: currency
         color: "#6B7FD4"
 
+  - id: meta_insurance_cpa_register
+    title: "Meta - Insurance Agents CPA & Register Weekly"
+    render: dual_line_chart
+    platform: meta
+    charts:
+      - label: "Registrations"
+        source: metabase
+        metabase_question: 8345
+        x_field: week
+        y_field: Register
+        format: number
+        color: "#E8956D"
+      - label: "CPA"
+        source: metabase
+        metabase_question: 8345
+        x_field: week
+        y_field: CPA
+        format: currency
+        color: "#E8C84A"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
