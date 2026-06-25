@@ -117,7 +117,7 @@ slides:
         source: metabase
         metabase_question: 8343
         x_field: week
-        y_field: CPA
+        y_field: cpa
         format: currency
         color: "#E8A020"
 
