@@ -37,6 +37,22 @@ slides:
     metabase_question_spend: 8331
     creative_file: "insurance.jpg"   # filename inside roomvu-weekly-report/assets/creatives/
 
+  - id: meta_financial_kpi
+    title: "Meta - Financial Planners Registration"
+    render: meta_kpi
+    platform: meta
+    metabase_question_registrations: 8337
+    metabase_question_spend: 8336
+    creative_file: "financial.jpg"
+
+  - id: meta_mortgage_kpi
+    title: "Meta - Mortgage Brokers Registration"
+    render: meta_kpi
+    platform: meta
+    metabase_question_registrations: 0
+    metabase_question_spend: 0
+    creative_file: "mortgage.jpg"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
