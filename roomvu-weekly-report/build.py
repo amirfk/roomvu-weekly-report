@@ -325,11 +325,11 @@ def build():
 
     generated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    # Compute most recently completed Tue–Mon week
+    # Compute most recently completed Wed–Tue week
     today = datetime.datetime.utcnow().date()
-    # week_end = most recent Monday (weekday 0)
-    days_to_monday = today.weekday()  # 0=Mon, 2=Wed, etc.
-    week_end = today if days_to_monday == 0 else today - datetime.timedelta(days=days_to_monday)
+    # week_end = most recent Tuesday (weekday 1)
+    days_since_tuesday = (today.weekday() - 1) % 7
+    week_end = today - datetime.timedelta(days=days_since_tuesday)
     week_start = week_end - datetime.timedelta(days=6)
     def _fmt_date(d):
         return d.strftime("%-d %b").replace(" 0", " ")  # "17 Jun"
