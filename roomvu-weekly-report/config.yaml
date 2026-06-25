@@ -45,6 +45,14 @@ slides:
     metabase_question_spend: 8336
     creative_file: "financial.jpg"
 
+  - id: meta_realtors_kpi
+    title: "Meta - Realtors Registration"
+    render: meta_kpi
+    platform: meta
+    metabase_question_registrations: 8334
+    metabase_question_spend: 8335
+    creative_file: ""
+
   - id: meta_mortgage_kpi
     title: "Meta - Mortgage Brokers Registration"
     render: meta_kpi
