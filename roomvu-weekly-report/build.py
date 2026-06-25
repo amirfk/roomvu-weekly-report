@@ -324,8 +324,21 @@ def build():
             slides_data.append({"title": title, "render": render, "skipped": True, "error": str(exc)})
 
     generated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+    # Compute most recently completed Tue–Mon week
+    today = datetime.datetime.utcnow().date()
+    # week_end = most recent Monday (weekday 0)
+    days_to_monday = today.weekday()  # 0=Mon, 2=Wed, etc.
+    week_end = today if days_to_monday == 0 else today - datetime.timedelta(days=days_to_monday)
+    week_start = week_end - datetime.timedelta(days=6)
+    def _fmt_date(d):
+        return d.strftime("%-d %b").replace(" 0", " ")  # "17 Jun"
+    week_label = f"{_fmt_date(week_start)} - {_fmt_date(week_end)}"
+    deck_title = f"Acquisition Report - {week_label}"
+
     html = tmpl.render(
-        deck_title=cfg["deck"]["title"],
+        deck_title=deck_title,
+        week_label=week_label,
         generated=generated,
         slides=slides_data,
         logo_url="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content",
