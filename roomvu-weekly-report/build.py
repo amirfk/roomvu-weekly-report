@@ -187,19 +187,24 @@ def build_meta_kpi_slide(slide_cfg, url_env, key_env):
 
 # ── Supermetrics / chart slides ───────────────────────────────────────────────
 
-def _fetch_chart_data(chart_cfg):
-    """Fetch one chart's data from Supermetrics. Returns (labels, values)."""
+def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
+    """Fetch one chart's data. Returns (labels, values)."""
     source = chart_cfg["source"]
-    fields = chart_cfg["fields"]      # e.g. ["Yearweekiso", "Cost"]
     x_field = chart_cfg["x_field"]
     y_field = chart_cfg["y_field"]
 
-    if source == "google_ads":
-        rows = sm.fetch_google_ads(fields, date_range_type="last_year_inc")
-    elif source == "linkedin_ads":
-        rows = sm.fetch_linkedin_ads(fields, date_range_type="last_year_inc")
+    if source == "metabase":
+        qid = chart_cfg["metabase_question"]
+        rows = fetch_question(qid, url_env, key_env)
+        # rows already keyed by column name
     else:
-        raise ValueError(f"Unknown chart source: {source}")
+        fields = chart_cfg["fields"]
+        if source == "google_ads":
+            rows = sm.fetch_google_ads(fields, date_range_type="last_year_inc")
+        elif source == "linkedin_ads":
+            rows = sm.fetch_linkedin_ads(fields, date_range_type="last_year_inc")
+        else:
+            raise ValueError(f"Unknown chart source: {source}")
 
     labels = []
     values = []
@@ -220,7 +225,7 @@ def _fetch_chart_data(chart_cfg):
     return labels, values
 
 
-def build_chart_slide(slide_cfg):
+def build_chart_slide(slide_cfg, url_env=None, key_env=None):
     title = slide_cfg["title"]
     render = slide_cfg.get("render", "dual_line_chart")
     charts_cfg = slide_cfg.get("charts", [])
@@ -229,7 +234,7 @@ def build_chart_slide(slide_cfg):
     charts_data = []
     for chart_cfg in charts_cfg:
         try:
-            labels, values = _fetch_chart_data(chart_cfg)
+            labels, values = _fetch_chart_data(chart_cfg, url_env, key_env)
             charts_data.append({
                 "label": chart_cfg["label"],
                 "labels": labels,
@@ -282,7 +287,7 @@ def build():
             elif render == "meta_kpi":
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render in ("dual_line_chart", "line_chart"):
-                slides_data.append(build_chart_slide(slide_cfg))
+                slides_data.append(build_chart_slide(slide_cfg, url_env, key_env))
             else:
                 print(f"  [SKIP] Unknown render type '{render}'")
                 slides_data.append({"title": slide_cfg.get("title", "?"), "skipped": True})

@@ -65,6 +65,20 @@ slides:
     metabase_question_spend: 8333
     creative_file: "mortgage.jpg"
 
+  # ── Meta line chart slides (Metabase) ─────────────────────────
+  - id: meta_realestate_spend
+    title: "Meta - Real Estate & MB Spend"
+    render: line_chart
+    platform: meta
+    charts:
+      - label: "Weekly Spend"
+        source: metabase
+        metabase_question: 8338
+        x_field: week
+        y_field: amount_spent
+        format: currency
+        color: "#6B7FD4"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
