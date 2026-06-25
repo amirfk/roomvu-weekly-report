@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Roomvu — Weekly ROI Cohort Report</title>
+  <title>Acquisition Report - 16 Jun - 22 Jun</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -85,10 +85,60 @@
       height: 100%;
       padding: 40px;
       box-sizing: border-box;
+      position: relative;
+      overflow: hidden;
     }
-    .title-slide img.logo { height: 56px; margin-bottom: 32px; filter: brightness(0) invert(1); }
-    .title-slide h1 { font-size: 1.7em; font-weight: 700; color: var(--white); margin: 0 0 16px; }
-    .title-slide .subtitle { font-size: .9em; color: rgba(255,255,255,.75); }
+    /* subtle diagonal accent */
+    .title-slide::before {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 340px; height: 340px;
+      background: rgba(255,255,255,.04);
+      border-radius: 50%;
+    }
+    .title-slide::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; left: -60px;
+      width: 260px; height: 260px;
+      background: rgba(255,255,255,.03);
+      border-radius: 50%;
+    }
+    .title-slide img.logo {
+      height: 52px;
+      margin-bottom: 36px;
+      filter: brightness(0) invert(1);
+      position: relative; z-index: 1;
+    }
+    .title-slide h1 {
+      font-size: 2em;
+      font-weight: 700;
+      color: var(--white);
+      margin: 0 0 8px;
+      line-height: 1.2;
+      position: relative; z-index: 1;
+    }
+    .title-slide .week-range {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #E8A020;
+      margin: 0 0 24px;
+      position: relative; z-index: 1;
+      letter-spacing: .02em;
+    }
+    .title-slide .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, #E8A020, #4CAF50);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+      position: relative; z-index: 1;
+    }
+    .title-slide .subtitle {
+      font-size: .8em;
+      color: rgba(255,255,255,.5);
+      position: relative; z-index: 1;
+    }
 
     /* ── Cohort table ────────────────────────────────────────── */
     .table-scroll {
@@ -280,8 +330,10 @@
     <section>
       <div class="title-slide">
         <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-        <h1>Roomvu — Weekly ROI Cohort Report</h1>
-        <p class="subtitle">Generated 2026-06-25 17:57 UTC</p>
+        <h1>Acquisition Report</h1>
+        <p class="week-range">16 Jun - 22 Jun</p>
+        <div class="divider"></div>
+        <p class="subtitle">Generated 2026-06-25 18:27 UTC</p>
       </div>
     </section>
 
@@ -291,7 +343,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -495,7 +547,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -699,7 +751,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -903,7 +955,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1107,7 +1159,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1166,7 +1218,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1225,7 +1277,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1284,7 +1336,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1343,7 +1395,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1444,7 +1496,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1545,7 +1597,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1646,7 +1698,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1747,7 +1799,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -1848,7 +1900,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
@@ -2023,7 +2075,7 @@
       <div class="slide-wrap">
         <div class="slide-header">
           <img class="logo" src="https://8y56.mjt.lu/img2/8y56/9273d331-017b-485d-81c4-42366a9f558f/content" alt="Roomvu" />
-          <span class="report-date">2026-06-25 17:57 UTC</span>
+          <span class="report-date">2026-06-25 18:27 UTC</span>
         </div>
         <div class="slide-title-block">
           
