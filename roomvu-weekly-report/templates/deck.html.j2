@@ -250,8 +250,15 @@
       margin: 0 0 6px;
       font-weight: 500;
     }
+    .chart-panel {
+      position: relative;
+      height: 360px;
+    }
     .chart-panel canvas {
-      max-height: 340px;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     /* ── Print / PDF ─────────────────────────────────────────── */
@@ -392,7 +399,7 @@
                 },
                 options: {
                   responsive: true,
-                  maintainAspectRatio: true,
+                  maintainAspectRatio: false,
                   animation: false,
                   plugins: {
                     legend: { display: false },
