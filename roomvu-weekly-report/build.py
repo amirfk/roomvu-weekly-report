@@ -238,7 +238,7 @@ def build_chart_slide(slide_cfg, url_env=None, key_env=None):
             charts_data.append({
                 "label": chart_cfg["label"],
                 "labels": labels,
-                "values": values,
+                "data": values,
                 "format": chart_cfg.get("format", "number"),
                 "color": chart_cfg.get("color", "#4A90D9"),
             })

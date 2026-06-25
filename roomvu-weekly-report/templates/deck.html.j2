@@ -369,8 +369,8 @@
             <canvas id="chart-{{ slide.id | default(loop.index0) }}-{{ loop.index0 }}"></canvas>
             <script>
             (function(){
-              var labels = {{ chart.labels | tojson }};
-              var values = {{ chart.values | tojson }};
+              var labels = {{ chart['labels'] | tojson }};
+              var values = {{ chart['data'] | tojson }};
               var fmt   = {{ chart.format | tojson }};
               var color = {{ chart.color | tojson }};
               var ctx = document.getElementById('chart-{{ slide.id | default(loop.index0) }}-{{ loop.index0 }}');
