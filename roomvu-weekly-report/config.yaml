@@ -15,18 +15,22 @@ slides:
     metabase_question: 8268
     title: "Meta · Insurance Agents — ROI Cohort (Weekly)"
     render: cohort_table
+    platform: meta
   - id: financial_planners_roi
     metabase_question: 8271
     title: "Meta · Financial Planners — ROI Cohort (Weekly)"
     render: cohort_table
+    platform: meta
   - id: realtors_roi
     metabase_question: 8279
     title: "Meta · Realtors — ROI Cohort (Weekly)"
     render: cohort_table
+    platform: meta
   - id: mortgage_roi
     metabase_question: 8280
     title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
     render: cohort_table
+    platform: meta
 
   # ── Meta KPI slides (Metabase) ────────────────────────────────
   - id: meta_insurance_kpi

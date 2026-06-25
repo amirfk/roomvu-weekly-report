@@ -61,8 +61,16 @@
       font-size: 1.15em;
       font-weight: 700;
       color: var(--navy);
-      margin: 0 0 14px;
+      margin: 0 0 4px;
       line-height: 1.3;
+    }
+    .slide-title-block { margin-bottom: 14px; }
+    .slide-title-underline {
+      height: 3px;
+      width: 200px;
+      background: linear-gradient(90deg, #E8A020 0%, #4CAF50 100%);
+      border-radius: 2px;
+      margin-top: 5px;
     }
 
     /* ── Title slide ─────────────────────────────────────────── */
@@ -89,7 +97,8 @@
     }
     table.cohort {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       font-size: .72em;
       min-width: 520px;
     }
@@ -98,26 +107,33 @@
       color: var(--white);
     }
     table.cohort thead th {
-      padding: 7px 10px;
+      padding: 9px 12px;
       font-weight: 600;
       text-align: center;
       white-space: nowrap;
-      border: 1px solid rgba(255,255,255,.15);
+      border-right: 1px solid rgba(255,255,255,.12);
+      letter-spacing: .02em;
+      font-size: .95em;
     }
+    table.cohort thead th:first-child { border-radius: 6px 0 0 0; }
+    table.cohort thead th:last-child  { border-radius: 0 6px 0 0; border-right: none; }
     table.cohort thead th.col-left { text-align: left; }
 
     table.cohort tbody tr:nth-child(even) { background: var(--gray50); }
-    table.cohort tbody tr:hover           { background: var(--gray200); }
+    table.cohort tbody tr:hover           { background: #eef2ff; }
     table.cohort tbody td {
-      padding: 6px 10px;
-      border: 1px solid var(--gray200);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--gray200);
+      border-right: 1px solid var(--gray200);
       text-align: center;
       white-space: nowrap;
+      font-size: .95em;
     }
-    table.cohort tbody td.col-left { text-align: left; }
+    table.cohort tbody td:last-child { border-right: none; }
+    table.cohort tbody td.col-left { text-align: left; font-weight: 500; }
 
     /* week-cell shading applied inline via style attr */
-    table.cohort tbody td.week-cell { font-weight: 500; }
+    table.cohort tbody td.week-cell { font-weight: 600; border-radius: 4px; }
     table.cohort tbody td.week-cell.blank { background: none !important; color: inherit; }
 
     /* ── Skip / error notice ─────────────────────────────────── */
@@ -270,7 +286,16 @@
           <img class="logo" src="{{ logo_url }}" alt="Roomvu" />
           <span class="report-date">{{ generated }}</span>
         </div>
-        <h2>{{ slide.title }}</h2>
+        <div class="slide-title-block">
+          {% if slide.platform == 'meta' %}
+          <div class="platform-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.269h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+            Meta
+          </div>
+          {% endif %}
+          <h2>{{ slide.title }}</h2>
+          <div class="slide-title-underline"></div>
+        </div>
 
         {% if slide.skipped %}
         <div class="skip-notice">
@@ -315,10 +340,6 @@
         </div>
 
         {% elif slide.render == 'meta_kpi' %}
-        <div class="platform-badge">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.269h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-          Meta
-        </div>
         <div class="kpi-wrap">
           <div class="kpi-left">
             {% for kpi in slide.kpis %}
