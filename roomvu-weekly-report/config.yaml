@@ -88,7 +88,7 @@ slides:
         source: metabase
         metabase_question: 8340
         x_field: week
-        y_field: subscription_rate
+        y_field: subscription_rate_pct
         format: percent
         color: "#6B7FD4"
 
