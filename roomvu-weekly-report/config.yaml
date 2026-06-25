@@ -108,6 +108,19 @@ slides:
         format: percent
         color: "#4A90D9"
 
+  - id: meta_realestate_cpa
+    title: "Meta - Real Estate Acquisition CPA"
+    render: line_chart
+    platform: meta
+    charts:
+      - label: "CPA"
+        source: metabase
+        metabase_question: 8343
+        x_field: week
+        y_field: CPA
+        format: currency
+        color: "#E8A020"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
