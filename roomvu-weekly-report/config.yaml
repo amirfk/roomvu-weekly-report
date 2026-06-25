@@ -121,6 +121,19 @@ slides:
         format: currency
         color: "#E8A020"
 
+  - id: meta_insurance_spend
+    title: "Meta - Insurance Agents Spend"
+    render: line_chart
+    platform: meta
+    charts:
+      - label: "Weekly Spend"
+        source: metabase
+        metabase_question: 8344
+        x_field: week
+        y_field: amount_spent
+        format: currency
+        color: "#6B7FD4"
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
