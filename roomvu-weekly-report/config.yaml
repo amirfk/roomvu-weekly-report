@@ -49,8 +49,8 @@ slides:
     title: "Meta - Mortgage Brokers Registration"
     render: meta_kpi
     platform: meta
-    metabase_question_registrations: 0
-    metabase_question_spend: 0
+    metabase_question_registrations: 8332
+    metabase_question_spend: 8333
     creative_file: "mortgage.jpg"
 
   # ── Google Ads slides (Supermetrics) ───────────────────────────
