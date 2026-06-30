@@ -6,7 +6,7 @@ import yaml
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-from metabase_client import fetch_question
+from metabase_client import fetch_question, execute_sql
 import supermetrics_client as sm
 
 ROOT = Path(__file__).parent
@@ -247,6 +247,29 @@ def _merge_region_rows(spend_rows: list, reg_rows: list) -> list:
     return result
 
 
+_REALTOR_TOT_SUBS_SQL = """
+SELECT
+  CASE
+    WHEN adsets.name LIKE '%California%' THEN 'California'
+    WHEN adsets.name LIKE '%East Coast%' THEN 'East Coast'
+    WHEN adsets.name LIKE '%Florida%'    THEN 'Florida'
+    WHEN adsets.name LIKE '%ON BC%' OR adsets.name LIKE '%ONBC%' THEN 'ON BC'
+    WHEN adsets.name LIKE '%Texas%'      THEN 'Texas'
+    ELSE 'All'
+  END AS Targeting,
+  COUNT(DISTINCT u.id) AS Tot_Subs
+FROM users u
+JOIN ads ON CAST(ads.ad_id AS CHAR) = u.utm_content
+JOIN ad_sets adsets ON adsets.id = ads.ad_set_id
+JOIN campaigns c ON c.id = adsets.campaign_id
+JOIN user_subscription us ON us.user_id = u.id
+WHERE c.name IN ('RV - Registration', 'RV - Registration USD')
+  AND us.status = 1
+GROUP BY Targeting
+ORDER BY Tot_Subs DESC
+""".strip()
+
+
 def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
     title = slide_cfg["title"]
     qid_spend = slide_cfg["metabase_question_spend"]
@@ -268,6 +291,7 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
 
     this_week_rows = []
     last_week_rows = []
+    tot_subs_map   = {}
     errors = []
 
     try:
@@ -283,6 +307,22 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
     except Exception as exc:
         errors.append(f"last_week: {exc}")
         print(f"  [ERR]  '{title}' last-week — {exc}", file=sys.stderr)
+
+    # All-time tot_subs per region (no date filter)
+    tot_subs_db = slide_cfg.get("tot_subs_database_id")
+    tot_subs_sql = slide_cfg.get("tot_subs_sql", _REALTOR_TOT_SUBS_SQL)
+    if tot_subs_db:
+        try:
+            rows = execute_sql(tot_subs_sql, int(tot_subs_db), url_env, key_env)
+            tot_subs_map = {str(r.get("Targeting", r.get("targeting", ""))): r.get("Tot_Subs", r.get("tot_subs", 0)) for r in rows}
+            print(f"  [OK]   '{title}' tot_subs — {tot_subs_map}")
+        except Exception as exc:
+            errors.append(f"tot_subs: {exc}")
+            print(f"  [ERR]  '{title}' tot_subs — {exc}", file=sys.stderr)
+
+    # Inject tot_subs into both period rows
+    for row in this_week_rows + last_week_rows:
+        row["tot_subs"] = tot_subs_map.get(str(row.get("targeting", "")))
 
     return {
         "id":              slide_cfg.get("id", ""),

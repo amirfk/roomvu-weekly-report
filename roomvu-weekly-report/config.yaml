@@ -161,6 +161,7 @@ slides:
     platform: meta
     metabase_question_spend: 8346
     metabase_question_reg: 8347
+    tot_subs_database_id: 74   # roomvu_ads_metrics — all-time active subs per region
 
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
