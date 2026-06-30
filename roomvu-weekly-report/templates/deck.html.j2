@@ -311,6 +311,46 @@
       height: 100% !important;
     }
 
+    /* ── Region table slide ─────────────────────────────────── */
+    .region-tables { display: flex; flex-direction: column; gap: 14px; flex: 1; overflow: auto; }
+    .region-period-label {
+      font-size: .75em;
+      font-weight: 700;
+      color: var(--gray600);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 4px;
+    }
+    table.region {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: .7em;
+      min-width: 560px;
+    }
+    table.region thead tr { background: var(--navy); color: var(--white); }
+    table.region thead th {
+      padding: 7px 10px;
+      font-weight: 600;
+      text-align: right;
+      white-space: nowrap;
+      border-right: 1px solid rgba(255,255,255,.12);
+      font-size: .93em;
+    }
+    table.region thead th:first-child { text-align: left; border-radius: 5px 0 0 0; }
+    table.region thead th:last-child  { border-right: none; border-radius: 0 5px 0 0; }
+    table.region tbody tr:nth-child(even) { background: var(--gray50); }
+    table.region tbody td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--gray200);
+      border-right: 1px solid var(--gray200);
+      text-align: right;
+      white-space: nowrap;
+    }
+    table.region tbody td:first-child { text-align: left; font-weight: 500; }
+    table.region tbody td:last-child  { border-right: none; }
+    table.region td.dash { color: var(--gray600); }
+
     /* ── Print / PDF ─────────────────────────────────────────── */
     @media print {
       .reveal .slides { font-size: 11pt; }
@@ -494,6 +534,46 @@
             })();
             </script>
             {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        {% elif slide.render == 'region_table' %}
+        {%- macro region_rows(rows) %}
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.targeting }}</td>
+            <td>${{ "{:,.0f}".format(row.spend | float) }}</td>
+            <td>{{ row.registrations }}</td>
+            <td>{% if row.cpa is not none %}${{ "{:.1f}".format(row.cpa | float) }}{% else %}<span class="dash">—</span>{% endif %}</td>
+            <td>{{ row.subs }}</td>
+            <td>{{ row.tot_subs }}</td>
+            <td>{% if row.imm_rev and row.imm_rev | float > 0 %}<strong>${{ "{:,.0f}".format(row.imm_rev | float) }}</strong>{% else %}<span class="dash">—</span>{% endif %}</td>
+            <td>{% if row.imm_rev_rate is not none and row.imm_rev_rate | float > 0 %}{{ "{:.0f}".format(row.imm_rev_rate | float) }}%{% else %}<span class="dash">—</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        {%- endmacro %}
+        <div class="region-tables">
+          {% for period_label, rows in [(slide.this_week_label, slide.this_week_rows), (slide.last_week_label, slide.last_week_rows)] %}
+          <div>
+            <p class="region-period-label">{{ period_label }}</p>
+            <div style="overflow-x:auto">
+              <table class="region">
+                <thead>
+                  <tr>
+                    <th>Targeting</th>
+                    <th>Spend</th>
+                    <th>Registrations</th>
+                    <th>CPA</th>
+                    <th>Subs.</th>
+                    <th>Tot. subs</th>
+                    <th>Imm Rev</th>
+                    <th>Imm Rev Rate</th>
+                  </tr>
+                </thead>
+                <tbody>{{ region_rows(rows) }}</tbody>
+              </table>
+            </div>
           </div>
           {% endfor %}
         </div>

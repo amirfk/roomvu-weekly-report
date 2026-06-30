@@ -154,6 +154,14 @@ slides:
         format: currency
         color: "#E8C84A"
 
+  # ── Region targeting table (Metabase, parameterised) ──────────
+  - id: meta_realtors_regions
+    title: "Meta - Regions based targeting"
+    render: region_table
+    platform: meta
+    metabase_question_spend: 8346
+    metabase_question_reg: 8347
+
   # ── Google Ads slides (Supermetrics) ───────────────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"

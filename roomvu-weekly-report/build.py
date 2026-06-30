@@ -185,6 +185,119 @@ def build_meta_kpi_slide(slide_cfg, url_env, key_env):
     }
 
 
+# ── Region table slide ───────────────────────────────────────────────────────
+
+def _date_params(start: str, end: str) -> list:
+    """Build Metabase template-tag parameters for start_date / end_date."""
+    return [
+        {"type": "date/single", "target": ["variable", ["template-tag", "start_date"]], "value": start},
+        {"type": "date/single", "target": ["variable", ["template-tag", "end_date"]],   "value": end},
+    ]
+
+
+def _merge_region_rows(spend_rows: list, reg_rows: list) -> list:
+    """Join spend + registration/subs rows on the targeting/region column."""
+    def find_key(row):
+        for k in ("targeting", "Targeting", "region", "Region", "ad_set_targeting"):
+            if k in row:
+                return k
+        return list(row.keys())[0] if row else "targeting"
+
+    join_key = find_key(spend_rows[0]) if spend_rows else "targeting"
+    reg_key  = find_key(reg_rows[0])  if reg_rows  else "targeting"
+
+    reg_map = {str(r.get(reg_key, "")).strip(): r for r in reg_rows}
+
+    def pick(d, *keys):
+        for k in keys:
+            if k in d:
+                return d[k]
+        return None
+
+    result = []
+    for sr in spend_rows:
+        region = str(sr.get(join_key, "")).strip()
+        rr = reg_map.get(region, {})
+        spend    = pick(sr, "spend", "Spend", "amount_spent", "Amount_Spent", "cost", "Cost") or 0
+        regs     = pick(rr, "registrations", "Registrations", "registration", "Registration") or 0
+        subs     = pick(rr, "subscriptions", "Subscriptions", "subscription", "Subscription") or 0
+        tot_subs = pick(rr, "total_subscriptions", "Total_Subscriptions", "tot_subs", "cumulative_subscriptions") or subs
+        imm_rev  = pick(rr, "immediate_revenue", "Immediate_Revenue", "Im. Revenue", "imm_revenue") or 0
+
+        try:
+            cpa = round(float(spend) / float(regs), 1) if float(regs) > 0 else None
+        except (TypeError, ValueError):
+            cpa = None
+
+        try:
+            imm_rev_rate = round(float(imm_rev) / float(spend) * 100, 0) if float(spend) > 0 else None
+        except (TypeError, ValueError):
+            imm_rev_rate = None
+
+        result.append({
+            "targeting":     region,
+            "spend":         spend,
+            "registrations": regs,
+            "cpa":           cpa,
+            "subs":          subs,
+            "tot_subs":      tot_subs,
+            "imm_rev":       imm_rev,
+            "imm_rev_rate":  imm_rev_rate,
+        })
+    return result
+
+
+def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
+    title = slide_cfg["title"]
+    qid_spend = slide_cfg["metabase_question_spend"]
+    qid_reg   = slide_cfg["metabase_question_reg"]
+
+    # This week: week_start..week_end; end_date is exclusive (+1 day)
+    this_start = week_start.strftime("%Y-%m-%d")
+    this_end   = (week_end + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    last_start = (week_start - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    last_end   = week_start.strftime("%Y-%m-%d")
+
+    def fetch_week(start, end):
+        params = _date_params(start, end)
+        spend_rows = fetch_question(qid_spend, url_env, key_env, parameters=params)
+        reg_rows   = fetch_question(qid_reg,   url_env, key_env, parameters=params)
+        print(f"    spend cols: {list(spend_rows[0].keys()) if spend_rows else '[]'}")
+        print(f"    reg cols:   {list(reg_rows[0].keys())  if reg_rows  else '[]'}")
+        return _merge_region_rows(spend_rows, reg_rows)
+
+    this_week_rows = []
+    last_week_rows = []
+    errors = []
+
+    try:
+        this_week_rows = fetch_week(this_start, this_end)
+        print(f"  [OK]   '{title}' this-week — {len(this_week_rows)} rows")
+    except Exception as exc:
+        errors.append(f"this_week: {exc}")
+        print(f"  [ERR]  '{title}' this-week — {exc}", file=sys.stderr)
+
+    try:
+        last_week_rows = fetch_week(last_start, last_end)
+        print(f"  [OK]   '{title}' last-week — {len(last_week_rows)} rows")
+    except Exception as exc:
+        errors.append(f"last_week: {exc}")
+        print(f"  [ERR]  '{title}' last-week — {exc}", file=sys.stderr)
+
+    return {
+        "id":              slide_cfg.get("id", ""),
+        "title":           title,
+        "render":          "region_table",
+        "platform":        slide_cfg.get("platform", "meta"),
+        "skipped":         False,
+        "this_week_label": f"{week_start.strftime('%-d %b')} – {week_end.strftime('%-d %b')}",
+        "last_week_label": f"{(week_start - datetime.timedelta(days=7)).strftime('%-d %b')} – {(week_end - datetime.timedelta(days=7)).strftime('%-d %b')}",
+        "this_week_rows":  this_week_rows,
+        "last_week_rows":  last_week_rows,
+        "error":           "; ".join(errors) if errors else None,
+    }
+
+
 # ── Supermetrics / chart slides ───────────────────────────────────────────────
 
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
@@ -305,6 +418,12 @@ def build():
     env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=True)
     tmpl = env.get_template("deck.html.j2")
 
+    # Compute most recently completed Wed–Tue week (needed by region_table slides)
+    today = datetime.datetime.utcnow().date()
+    days_since_tuesday = (today.weekday() - 1) % 7
+    week_end = today - datetime.timedelta(days=days_since_tuesday)
+    week_start = week_end - datetime.timedelta(days=6)
+
     slides_data = []
     for slide_cfg in cfg["slides"]:
         render = slide_cfg.get("render", "cohort_table")
@@ -315,6 +434,8 @@ def build():
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render in ("dual_line_chart", "line_chart"):
                 slides_data.append(build_chart_slide(slide_cfg, url_env, key_env))
+            elif render == "region_table":
+                slides_data.append(build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end))
             else:
                 print(f"  [SKIP] Unknown render type '{render}'")
                 slides_data.append({"title": slide_cfg.get("title", "?"), "skipped": True})
@@ -325,12 +446,6 @@ def build():
 
     generated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    # Compute most recently completed Wed–Tue week
-    today = datetime.datetime.utcnow().date()
-    # week_end = most recent Tuesday (weekday 1)
-    days_since_tuesday = (today.weekday() - 1) % 7
-    week_end = today - datetime.timedelta(days=days_since_tuesday)
-    week_start = week_end - datetime.timedelta(days=6)
     def _fmt_date(d):
         return d.strftime("%-d %b").replace(" 0", " ")  # "17 Jun"
     week_label = f"{_fmt_date(week_start)} - {_fmt_date(week_end)}"
