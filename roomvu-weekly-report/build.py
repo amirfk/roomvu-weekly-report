@@ -220,9 +220,9 @@ def _merge_region_rows(spend_rows: list, reg_rows: list) -> list:
         rr = reg_map.get(region, {})
         spend    = pick(sr, "spend", "Spend", "amount_spent", "Amount_Spent", "cost", "Cost") or 0
         regs     = pick(rr, "registrations", "Registrations", "registration", "Registration") or 0
-        subs     = pick(rr, "subscriptions", "Subscriptions", "subscription", "Subscription") or 0
-        tot_subs = pick(rr, "total_subscriptions", "Total_Subscriptions", "tot_subs", "cumulative_subscriptions") or subs
-        imm_rev  = pick(rr, "immediate_revenue", "Immediate_Revenue", "Im. Revenue", "imm_revenue") or 0
+        subs     = pick(rr, "Subs", "subs", "subscriptions", "Subscriptions", "subscription", "Subscription") or 0
+        tot_subs = pick(rr, "Tot_Subs", "tot_subs", "total_subscriptions", "Total_Subscriptions", "cumulative_subscriptions")  # may be None — no source yet
+        imm_rev  = pick(rr, "Imm_Revenue", "imm_revenue", "immediate_revenue", "Immediate_Revenue", "Im. Revenue") or 0
 
         try:
             cpa = round(float(spend) / float(regs), 1) if float(regs) > 0 else None

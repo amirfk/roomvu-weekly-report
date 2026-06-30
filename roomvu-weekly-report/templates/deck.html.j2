@@ -547,7 +547,7 @@
             <td>{{ row.registrations }}</td>
             <td>{% if row.cpa is not none %}${{ "{:.1f}".format(row.cpa | float) }}{% else %}<span class="dash">—</span>{% endif %}</td>
             <td>{{ row.subs }}</td>
-            <td>{{ row.tot_subs }}</td>
+            <td>{% if row.tot_subs is not none %}{{ row.tot_subs }}{% else %}<span class="dash" title="No data source configured">—</span>{% endif %}</td>
             <td>{% if row.imm_rev and row.imm_rev | float > 0 %}<strong>${{ "{:,.0f}".format(row.imm_rev | float) }}</strong>{% else %}<span class="dash">—</span>{% endif %}</td>
             <td>{% if row.imm_rev_rate is not none and row.imm_rev_rate | float > 0 %}{{ "{:.0f}".format(row.imm_rev_rate | float) }}%{% else %}<span class="dash">—</span>{% endif %}</td>
           </tr>
