@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build-and-publish:
@@ -44,21 +42,5 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: weekly ROI cohort report $(date -u +%Y-%m-%d)"
           git push
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
-  deploy:
-    needs: build-and-publish
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      # index.html is committed to main root above — Pages serves it directly.
+      # No deploy-pages action needed when source = "Deploy from branch / main / (root)".
