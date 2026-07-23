@@ -342,31 +342,35 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
 
 _GOOGLE_TOTAL_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(us.created_at), '|', WEEK(us.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
-  ROUND(SUM(us.amount), 2) AS total_revenue
+  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS total_revenue
 FROM users u
-JOIN user_subscription us ON us.user_id = u.id
-WHERE u.utm_source IN ('google', 'google-ads')
-  AND us.status = 1
-  AND us.created_at >= '2025-01-01'
+JOIN financials f ON f.user_id = u.id
+WHERE u.user_type_id != 1
+  AND u.utm_source IN ('google', 'google-ads')
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.amount >= 1.0
+  AND u.created_at >= '2025-01-01'
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
 
 _GOOGLE_IMM_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(us.created_at), '|', WEEK(us.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
-  ROUND(SUM(us.amount), 2) AS imm_revenue
+  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS imm_revenue
 FROM users u
-JOIN user_subscription us ON us.user_id = u.id
-WHERE u.utm_source IN ('google', 'google-ads')
-  AND us.status = 1
-  AND us.created_at <= DATE_ADD(u.created_at, INTERVAL 7 DAY)
-  AND us.created_at >= '2025-01-01'
+JOIN financials f ON f.user_id = u.id
+WHERE u.user_type_id != 1
+  AND u.utm_source IN ('google', 'google-ads')
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.amount >= 1.0
+  AND f.created_at <= DATE_ADD(u.created_at, INTERVAL 7 DAY)
+  AND u.created_at >= '2025-01-01'
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
@@ -420,12 +424,19 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         num_rows = execute_sql(sql, database_id, url_env, key_env)
         # Denominator: Google Ads weekly spend from Supermetrics
         spend_rows = sm.fetch_google_ads(["Yearweekiso", "Cost"], date_range_type="last_year_inc")
-        spend_map  = {str(r.get("Yearweekiso", "")): float(r.get("Cost", 0) or 0) for r in spend_rows}
+        def _norm_yw(v):
+            s = str(v)
+            if '|' in s:
+                y, w = s.split('|', 1)
+                return f"{y}|{int(w)}"
+            return s
+
+        spend_map  = {_norm_yw(r.get("Yearweekiso", "")): float(r.get("Cost", 0) or 0) for r in spend_rows}
 
         labels = []
         values = []
         for row in num_rows:
-            wk = str(row.get("week_idx", ""))
+            wk = _norm_yw(row.get("week_idx", ""))
             spend = spend_map.get(wk, 0)
             if spend <= 0:
                 continue
