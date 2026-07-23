@@ -2,7 +2,7 @@
 metabase_url_env: METABASE_URL
 metabase_api_key_env: METABASE_API_KEY
 supermetrics_api_key_env: SUPERMETRICS_API_KEY
-google_ads_account_id: "459-407-5026"
+google_ads_account_id: "4594075026"
 linkedin_ads_account_id: "508540143"
 
 deck:

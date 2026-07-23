@@ -43,7 +43,9 @@ def fetch(ds_id, account_id, fields, date_range_type="this_year",
 
     resp = requests.get(SUPERMETRICS_URL, params=qs_pairs, timeout=60)
     if not resp.ok:
-        raise ValueError(f"Supermetrics {resp.status_code}: {resp.text[:600]}")
+        # Include request ID header so it can be sent to Supermetrics support
+        req_id = resp.headers.get("X-Request-Id", resp.headers.get("X-SM-Request-Id", "n/a"))
+        raise ValueError(f"Supermetrics {resp.status_code} (request_id={req_id}): {resp.text[:600]}")
     result = resp.json()
 
     if result.get("meta", {}).get("status") == "error":
