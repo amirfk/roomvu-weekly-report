@@ -342,31 +342,31 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
 
 _GOOGLE_TOTAL_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  CONCAT(YEAR(us.created_at), '|', WEEK(us.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
   ROUND(SUM(us.amount), 2) AS total_revenue
 FROM users u
 JOIN user_subscription us ON us.user_id = u.id
 WHERE u.utm_source IN ('google', 'google-ads')
   AND us.status = 1
-  AND u.created_at >= '2025-01-01'
+  AND us.created_at >= '2025-01-01'
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
 
 _GOOGLE_IMM_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  CONCAT(YEAR(us.created_at), '|', WEEK(us.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(us.created_at), INTERVAL WEEKDAY(us.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
   ROUND(SUM(us.amount), 2) AS imm_revenue
 FROM users u
 JOIN user_subscription us ON us.user_id = u.id
 WHERE u.utm_source IN ('google', 'google-ads')
   AND us.status = 1
   AND us.created_at <= DATE_ADD(u.created_at, INTERVAL 7 DAY)
-  AND u.created_at >= '2025-01-01'
+  AND us.created_at >= '2025-01-01'
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
