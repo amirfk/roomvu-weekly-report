@@ -52,7 +52,18 @@ def fetch(ds_id, account_id, fields, date_range_type="this_year",
         raise ValueError(f"Supermetrics error: {result}")
 
     rows = result.get("data", [])
+    # Supermetrics includes a header row as row[0] — skip it
+    if rows and rows[0] == list(fields):
+        rows = rows[1:]
+    elif rows and isinstance(rows[0][0], str) and not _looks_like_data(rows[0][0]):
+        rows = rows[1:]
     return [dict(zip(fields, row)) for row in rows]
+
+
+def _looks_like_data(val: str) -> bool:
+    """Return True if val looks like actual data (year|week, a date, a number)."""
+    import re
+    return bool(re.match(r'^\d', val))
 
 
 def fetch_google_ads(fields, date_range_type="last_year_inc",
