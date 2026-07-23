@@ -338,6 +338,40 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
     }
 
 
+# ── Google Ads revenue SQL (run via execute_sql against db 74) ────────────────
+
+_GOOGLE_TOTAL_REVENUE_SQL = """
+SELECT
+  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  ROUND(SUM(us.amount), 2) AS total_revenue
+FROM users u
+JOIN user_subscription us ON us.user_id = u.id
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND us.status = 1
+  AND u.created_at >= '2025-01-01'
+GROUP BY week_idx, week
+ORDER BY week_idx
+""".strip()
+
+_GOOGLE_IMM_REVENUE_SQL = """
+SELECT
+  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  ROUND(SUM(us.amount), 2) AS imm_revenue
+FROM users u
+JOIN user_subscription us ON us.user_id = u.id
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND us.status = 1
+  AND us.created_at <= DATE_ADD(u.created_at, INTERVAL 7 DAY)
+  AND u.created_at >= '2025-01-01'
+GROUP BY week_idx, week
+ORDER BY week_idx
+""".strip()
+
+
 # ── Supermetrics / chart slides ───────────────────────────────────────────────
 
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
@@ -370,6 +404,34 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
                 ratio = 0
             labels.append(str(raw_x))
             values.append(ratio)
+        return labels, values
+
+    elif source == "google_ads_ratio":
+        # Numerator: revenue from Metabase (execute_sql); denominator: spend from Supermetrics
+        database_id = chart_cfg["database_id"]
+        num_sql     = chart_cfg["numerator_sql"]
+        num_field   = chart_cfg["numerator_field"]
+        # SQL constants are referenced by name
+        sql_map = {
+            "google_total_revenue": _GOOGLE_TOTAL_REVENUE_SQL,
+            "google_imm_revenue":   _GOOGLE_IMM_REVENUE_SQL,
+        }
+        sql = sql_map.get(num_sql, num_sql)
+        num_rows = execute_sql(sql, database_id, url_env, key_env)
+        # Denominator: Google Ads weekly spend from Supermetrics
+        spend_rows = sm.fetch_google_ads(["Yearweekiso", "Cost"], date_range_type="last_year_inc")
+        spend_map  = {str(r.get("Yearweekiso", "")): float(r.get("Cost", 0) or 0) for r in spend_rows}
+
+        labels = []
+        values = []
+        for row in num_rows:
+            wk = str(row.get("week_idx", ""))
+            spend = spend_map.get(wk, 0)
+            if spend <= 0:
+                continue
+            rev = float(row.get(num_field, 0) or 0)
+            labels.append(str(row.get(x_field, wk)))
+            values.append(round(rev / spend * 100, 2))
         return labels, values
 
     elif source == "metabase":

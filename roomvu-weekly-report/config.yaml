@@ -163,25 +163,27 @@ slides:
     metabase_question_reg: 8347
     tot_subs_database_id: 74   # roomvu_ads_metrics — all-time active subs per region
 
-  # ── Google Ads slides (Supermetrics) ───────────────────────────
+  # ── Google Ads slides (Supermetrics + Metabase) ────────────────
   - id: google_all_campaigns
     title: "Google - All campaigns"
     render: dual_line_chart
     platform_icon: google
     charts:
-      - label: "Google Total Spending"
-        source: google_ads
-        fields: [Yearweekiso, Cost]
-        x_field: Yearweekiso
-        y_field: Cost
-        format: currency
+      - label: "Total Return Rate"
+        source: google_ads_ratio
+        database_id: 74
+        numerator_sql: google_total_revenue
+        numerator_field: total_revenue
+        x_field: week
+        format: percent
         color: "#4A90D9"
-      - label: "Google CPA"
-        source: google_ads
-        fields: [Yearweekiso, CostPerConversion]
-        x_field: Yearweekiso
-        y_field: CostPerConversion
-        format: currency
-        color: "#4A90D9"
+      - label: "Immediate Revenue Rate"
+        source: google_ads_ratio
+        database_id: 74
+        numerator_sql: google_imm_revenue
+        numerator_field: imm_revenue
+        x_field: week
+        format: percent
+        color: "#E8956D"
 
 fixed_columns: [week_idx, week, Registration, Amount_Spent]
