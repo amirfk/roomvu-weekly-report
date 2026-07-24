@@ -343,16 +343,23 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
 # Revenue is grouped by PAYMENT week (cash received that week), matching the
 # marketing team's "Data Feed" sheet. Weeks are Mon-Sun ISO, same as
 # Supermetrics Yearweekiso. The current (incomplete) week is excluded.
+# Matches the sheet's "Total Revenue" = Subscriptions + 0.3 x Smart Ads:
+# subscriptions counted in full, Smart Ads at 30% (roomvu's margin — the rest
+# passes through to client ad spend). AI credits / other charges excluded.
 _GOOGLE_TOTAL_REVENUE_SQL = """
 SELECT
   CONCAT(YEAR(f.created_at), '|', LPAD(WEEK(f.created_at, 3), 2, '0')) AS week_idx,
   CONCAT(DATE_FORMAT(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), '%d %b'), ' - ',
          DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
-  ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS total_revenue
+  ROUND(SUM(
+    IF(f.currency='CAD', f.amount, f.amount * 1.3)
+    * IF(f.morph_type LIKE 'SMART_AD%', 0.3, 1)
+  ), 2) AS total_revenue
 FROM users u
 JOIN financials f ON f.user_id = u.id
 WHERE u.utm_source IN ('google', 'google-ads')
   AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND (f.morph_type LIKE 'SUBSCRIPTION%' OR f.morph_type LIKE 'SMART_AD%')
   AND f.amount >= 1.0
   AND f.created_at >= '2025-01-01'
   AND f.created_at < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
@@ -360,7 +367,8 @@ GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
 
-# Immediate revenue: payments received in the same ISO week the user registered.
+# Immediate revenue: subscription payments received in the same ISO week the
+# user registered (verified exact against the marketing sheet's Imm Revenue).
 _GOOGLE_IMM_REVENUE_SQL = """
 SELECT
   CONCAT(YEAR(f.created_at), '|', LPAD(WEEK(f.created_at, 3), 2, '0')) AS week_idx,
@@ -371,6 +379,7 @@ FROM users u
 JOIN financials f ON f.user_id = u.id
 WHERE u.utm_source IN ('google', 'google-ads')
   AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.morph_type LIKE 'SUBSCRIPTION%'
   AND f.amount >= 1.0
   AND YEARWEEK(f.created_at, 3) = YEARWEEK(u.created_at, 3)
   AND f.created_at >= '2025-01-01'
