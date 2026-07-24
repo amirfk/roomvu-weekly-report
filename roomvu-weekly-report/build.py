@@ -448,16 +448,32 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
             wk = _norm_yw(r.get("Yearweekiso", ""))
             spend_map[wk] = spend_map.get(wk, 0.0) + float(r.get("Cost", 0) or 0)
 
+        rev_map = {_norm_yw(row.get("week_idx", "")): float(row.get(num_field, 0) or 0)
+                   for row in num_rows}
+
+        # Axis = every complete week that had spend, so weeks with zero
+        # revenue chart as 0% (matches the marketing sheet). last_weeks
+        # trims to the reference deck's rolling window.
+        import datetime
+        today = datetime.date.today()
+        iso = today.isocalendar()
+        current_wk = f"{iso[0]}|{iso[1]}"
+        weeks = sorted(
+            (wk for wk, sp in spend_map.items() if sp > 0 and wk != current_wk),
+            key=lambda s: (int(s.split('|')[0]), int(s.split('|')[1])),
+        )
+        last_n = chart_cfg.get("last_weeks")
+        if last_n:
+            weeks = weeks[-int(last_n):]
+
         labels = []
         values = []
-        for row in num_rows:
-            wk = _norm_yw(row.get("week_idx", ""))
-            spend = spend_map.get(wk, 0)
-            if spend <= 0:
-                continue
-            rev = float(row.get(num_field, 0) or 0)
-            labels.append(str(row.get(x_field, wk)))
-            values.append(round(rev / spend * 100, 2))
+        for wk in weeks:
+            y, w = wk.split('|')
+            monday = datetime.date.fromisocalendar(int(y), int(w), 1)
+            sunday = monday + datetime.timedelta(days=6)
+            labels.append(f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b')}")
+            values.append(round(rev_map.get(wk, 0.0) / spend_map[wk] * 100, 2))
         return labels, values
 
     elif source == "metabase":

@@ -182,6 +182,7 @@ slides:
         x_field: week
         format: percent
         color: "#4A90D9"
+        last_weeks: 46
         spend_basis: acquisition
         acquisition_campaign_ids:
           - "16587957261"   # RV - Registration - PPC Social Media
@@ -199,6 +200,7 @@ slides:
         x_field: week
         format: percent
         color: "#E8956D"
+        last_weeks: 46
         spend_basis: total
 
 fixed_columns: [week_idx, week, Registration, Amount_Spent]
