@@ -389,7 +389,73 @@ ORDER BY week_idx
 """.strip()
 
 
+# Registrations per ISO week (CPA denominator). Google-attributed users only,
+# grouped by registration week. Week key matches Supermetrics Yearweekiso.
+_GOOGLE_REGISTRATIONS_SQL = """
+SELECT
+  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
+  COUNT(*) AS registrations
+FROM users u
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND u.created_at >= '2025-01-01'
+GROUP BY week_idx
+ORDER BY week_idx
+""".strip()
+
+
 # ── Supermetrics / chart slides ───────────────────────────────────────────────
+
+def _norm_yw(v):
+    """Normalise a YEAR|week key so '2025|01' and '2025|1' compare equal."""
+    s = str(v)
+    if '|' in s:
+        y, w = s.split('|', 1)
+        return f"{y}|{int(w)}"
+    return s
+
+
+def _google_spend_map(basis="total", acq_ids=None):
+    """Weekly Google Ads spend from Supermetrics, keyed by normalised YEAR|week.
+
+    basis 'acquisition' keeps only the campaigns in acq_ids (PPC + Competitors —
+    the marketing sheet's "Total Spending (Acquisition)"); 'total' sums the
+    whole account (the sheet's "Total Spending").
+    """
+    acq_ids = {str(c) for c in (acq_ids or [])}
+    spend_rows = sm.fetch_google_ads(["Yearweekiso", "Campaignid", "Cost"],
+                                     date_range_type="last_year_inc")
+    spend_map = {}
+    for r in spend_rows:
+        if basis == "acquisition" and str(r.get("Campaignid", "")) not in acq_ids:
+            continue
+        wk = _norm_yw(r.get("Yearweekiso", ""))
+        spend_map[wk] = spend_map.get(wk, 0.0) + float(r.get("Cost", 0) or 0)
+    return spend_map
+
+
+def _complete_week_window(spend_map, last_n=None):
+    """Sorted YEAR|week keys that had spend, excluding the current partial week.
+    last_n trims to the trailing N weeks (reference deck's rolling window)."""
+    import datetime
+    iso = datetime.date.today().isocalendar()
+    current_wk = f"{iso[0]}|{iso[1]}"
+    weeks = sorted(
+        (wk for wk, sp in spend_map.items() if sp > 0 and wk != current_wk),
+        key=lambda s: (int(s.split('|')[0]), int(s.split('|')[1])),
+    )
+    if last_n:
+        weeks = weeks[-int(last_n):]
+    return weeks
+
+
+def _week_label(wk):
+    """'2026|20' -> '11 May - 17 May' (Mon-Sun of that ISO week)."""
+    import datetime
+    y, w = wk.split('|')
+    monday = datetime.date.fromisocalendar(int(y), int(w), 1)
+    sunday = monday + datetime.timedelta(days=6)
+    return f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b')}"
+
 
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     """Fetch one chart's data. Returns (labels, values)."""
@@ -436,53 +502,44 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         sql = sql_map.get(num_sql, num_sql)
         num_rows = execute_sql(sql, database_id, url_env, key_env)
         # Denominator: Google Ads weekly spend from Supermetrics, per campaign.
-        # spend_basis "acquisition" keeps only the campaigns in
-        # acquisition_campaign_ids (PPC/Competitors — the marketing sheet's
-        # "Total Spending (Acquisition)"); "total" sums the whole account.
-        spend_rows = sm.fetch_google_ads(["Yearweekiso", "Campaignid", "Cost"],
-                                         date_range_type="last_year_inc")
-        def _norm_yw(v):
-            s = str(v)
-            if '|' in s:
-                y, w = s.split('|', 1)
-                return f"{y}|{int(w)}"
-            return s
-
-        acq_ids = {str(c) for c in chart_cfg.get("acquisition_campaign_ids", [])}
-        basis   = chart_cfg.get("spend_basis", "total")
-        spend_map = {}
-        for r in spend_rows:
-            if basis == "acquisition" and str(r.get("Campaignid", "")) not in acq_ids:
-                continue
-            wk = _norm_yw(r.get("Yearweekiso", ""))
-            spend_map[wk] = spend_map.get(wk, 0.0) + float(r.get("Cost", 0) or 0)
-
+        spend_map = _google_spend_map(
+            basis=chart_cfg.get("spend_basis", "total"),
+            acq_ids=chart_cfg.get("acquisition_campaign_ids"),
+        )
         rev_map = {_norm_yw(row.get("week_idx", "")): float(row.get(num_field, 0) or 0)
                    for row in num_rows}
-
         # Axis = every complete week that had spend, so weeks with zero
-        # revenue chart as 0% (matches the marketing sheet). last_weeks
-        # trims to the reference deck's rolling window.
-        import datetime
-        today = datetime.date.today()
-        iso = today.isocalendar()
-        current_wk = f"{iso[0]}|{iso[1]}"
-        weeks = sorted(
-            (wk for wk, sp in spend_map.items() if sp > 0 and wk != current_wk),
-            key=lambda s: (int(s.split('|')[0]), int(s.split('|')[1])),
-        )
-        last_n = chart_cfg.get("last_weeks")
-        if last_n:
-            weeks = weeks[-int(last_n):]
+        # revenue chart as 0% (matches the marketing sheet).
+        weeks = _complete_week_window(spend_map, chart_cfg.get("last_weeks"))
+        labels = [_week_label(wk) for wk in weeks]
+        values = [round(rev_map.get(wk, 0.0) / spend_map[wk] * 100, 2) for wk in weeks]
+        return labels, values
 
-        labels = []
-        values = []
+    elif source == "google_ads_spend":
+        # Weekly Google Ads spend from Supermetrics (line chart, currency).
+        spend_map = _google_spend_map(
+            basis=chart_cfg.get("spend_basis", "total"),
+            acq_ids=chart_cfg.get("acquisition_campaign_ids"),
+        )
+        weeks = _complete_week_window(spend_map, chart_cfg.get("last_weeks"))
+        return [_week_label(wk) for wk in weeks], [round(spend_map[wk], 2) for wk in weeks]
+
+    elif source == "google_ads_cpa":
+        # CPA = weekly spend (Supermetrics) / registrations that week (Metabase).
+        spend_map = _google_spend_map(
+            basis=chart_cfg.get("spend_basis", "total"),
+            acq_ids=chart_cfg.get("acquisition_campaign_ids"),
+        )
+        reg_rows = execute_sql(_GOOGLE_REGISTRATIONS_SQL, chart_cfg["database_id"],
+                               url_env, key_env)
+        reg_map = {_norm_yw(r.get("week_idx", "")): float(r.get("registrations", 0) or 0)
+                   for r in reg_rows}
+        weeks = _complete_week_window(spend_map, chart_cfg.get("last_weeks"))
+        labels, values = [], []
         for wk in weeks:
-            y, w = wk.split('|')
-            monday = datetime.date.fromisocalendar(int(y), int(w), 1)
-            sunday = monday + datetime.timedelta(days=6)
-            labels.append(f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b')}")
-            values.append(round(rev_map.get(wk, 0.0) / spend_map[wk] * 100, 2))
+            regs = reg_map.get(wk, 0)
+            labels.append(_week_label(wk))
+            values.append(round(spend_map[wk] / regs, 2) if regs > 0 else 0)
         return labels, values
 
     elif source == "metabase":

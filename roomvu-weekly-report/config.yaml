@@ -203,4 +203,27 @@ slides:
         last_weeks: 46
         spend_basis: total
 
+  # Google Total Spending (whole account) + CPA (spend / registrations).
+  # Mirrors the Data Feed sheet: Total Spending = C, CPA = C / # Registrations.
+  - id: google_spend_cpa
+    title: "Google - All campaigns"
+    render: dual_line_chart
+    platform_icon: google
+    charts:
+      - label: "Google Total Spending"
+        source: google_ads_spend
+        x_field: week
+        format: currency
+        color: "#4A90D9"
+        last_weeks: 46
+        spend_basis: total
+      - label: "Google CPA"
+        source: google_ads_cpa
+        database_id: 74
+        x_field: week
+        format: currency
+        color: "#E8A020"
+        last_weeks: 46
+        spend_basis: total
+
 fixed_columns: [week_idx, week, Registration, Amount_Spent]
