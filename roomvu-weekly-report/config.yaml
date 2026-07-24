@@ -243,4 +243,21 @@ slides:
         - title: "Custom Brokerage Videos"
           lines: ["Designed for Your Brokerage", "Branded with Your Contact Info"]
 
+  # ── Meta & Google combined (Real Estate & MB) ─────────────────────────
+  # "All Paid channel" tab = Facebook + Google summed on one Wed-Tue grid.
+  # Meta half reuses the existing RE&MB questions; Google half is live.
+  #   Total Spending  = Meta spend (8342) + Google spend (Supermetrics)
+  #   Total Revenue   = Meta revenue (8341) + Google revenue (subs + 0.3*smart)
+  #   Registrations   = Meta (spend/CPA via 8343) + Google registrations
+  #   Imm Return Rate = combined immediate revenue / combined spend
+  - id: combined_re_mb
+    title: "Meta & Google – Real Estate & MB"
+    render: combined_re_mb
+    database_id: 74
+    anchor: "2025-08-06"
+    last_weeks: 46
+    meta_revenue_q: 8341
+    meta_spend_q: 8342
+    meta_cpa_q: 8343
+
 fixed_columns: [week_idx, week, Registration, Amount_Spent]

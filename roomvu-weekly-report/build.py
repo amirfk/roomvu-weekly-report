@@ -287,6 +287,196 @@ WHERE u.utm_source IN ('google', 'google-ads')
     }
 
 
+# ── Combined Meta + Google (Real Estate & MB) slide ───────────────────────────
+# The marketing sheet's "All Paid channel" tab = Facebook + Google summed on a
+# shared Wed–Tue weekly grid (cohort weeks anchored at META_ANCHOR). The Meta
+# half is sourced from the existing Metabase questions (which encode the RE&MB
+# segment we can't reconstruct from raw tables); the Google half is computed
+# live from db 74 + Supermetrics on the same grid.
+_META_ANCHOR = "2025-08-06"   # Wednesday; question 8341's cohort anchor
+
+
+def _cohort_label(anchor_str, widx):
+    a = datetime.date.fromisoformat(anchor_str)
+    start = a + datetime.timedelta(days=int(widx) * 7)
+    end = start + datetime.timedelta(days=6)
+    return f"{start.strftime('%-d %b')} - {end.strftime('%-d %b')}".replace(" 0", " ")
+
+
+def _g_cohort_rev_sql(anchor):
+    return f"""
+WITH anchor AS (SELECT DATE '{anchor}' AS d)
+SELECT
+  FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7) AS widx,
+  ROUND(SUM(IF(f.morph_type LIKE 'SUBSCRIPTION%', IF(f.currency='CAD', f.amount, f.amount*1.3), 0)
+          + IF(f.morph_type LIKE 'SMART_AD%', IF(f.currency='CAD', f.amount, f.amount*1.3)*0.3, 0)), 2) AS revenue,
+  ROUND(SUM(IF(f.morph_type LIKE 'SUBSCRIPTION%'
+             AND FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) = FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7),
+             IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS imm_rev
+FROM users u JOIN financials f ON f.user_id = u.id
+WHERE u.utm_source IN ('google','google-ads')
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND (f.morph_type LIKE 'SUBSCRIPTION%' OR f.morph_type LIKE 'SMART_AD%')
+  AND f.amount >= 1.0
+  AND f.created_at >= '{anchor}'
+GROUP BY widx
+""".strip()
+
+
+def _g_cohort_reg_sql(anchor):
+    return f"""
+WITH anchor AS (SELECT DATE '{anchor}' AS d)
+SELECT FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) AS widx, COUNT(*) AS registrations
+FROM users u
+WHERE u.utm_source IN ('google','google-ads') AND u.created_at >= '{anchor}'
+GROUP BY widx
+""".strip()
+
+
+def _meta_cohort_imm_sql(anchor):
+    # Meta immediate revenue by cohort week. Uses facebook/paidsocial; this is
+    # broader than the exact RE&MB segment (no campaign filter available live),
+    # so treat the Imm Return Rate chart as approximate until a dedicated
+    # Meta-immediate-revenue question is wired in.
+    return f"""
+WITH anchor AS (SELECT DATE '{anchor}' AS d)
+SELECT FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7) AS widx,
+  ROUND(SUM(IF(FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) = FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7),
+             IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS imm_rev
+FROM users u JOIN financials f ON f.user_id = u.id
+WHERE u.utm_source = 'facebook' AND u.utm_medium = 'paidsocial'
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.morph_type LIKE 'SUBSCRIPTION%'
+  AND f.amount >= 1.0
+  AND f.created_at >= '{anchor}'
+GROUP BY widx
+""".strip()
+
+
+def _google_daily_spend_by_cohort(anchor_str):
+    """Google Ads spend bucketed into Wed–Tue cohort weeks from daily Supermetrics."""
+    a = datetime.date.fromisoformat(anchor_str)
+    out = {}
+    for r in sm.fetch_google_ads(["Date", "Cost"], date_range_type="last_year_inc"):
+        raw = str(r.get("Date", ""))[:10]
+        try:
+            d = datetime.date.fromisoformat(raw)
+        except ValueError:
+            continue
+        widx = (d - a).days // 7
+        if widx < 0:
+            continue
+        out[widx] = out.get(widx, 0.0) + float(r.get("Cost", 0) or 0)
+    return out
+
+
+def _q_num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_combined_re_mb_slide(slide_cfg, url_env, key_env):
+    """Meta + Google (Real Estate & MB) combined slide: Spending+Revenue,
+    Registrations, and Imm. Return Rate, summed per cohort week."""
+    title = slide_cfg["title"]
+    anchor = slide_cfg.get("anchor", _META_ANCHOR)
+    db = slide_cfg.get("database_id", 74)
+    last_n = int(slide_cfg.get("last_weeks", 46))
+    errors = []
+
+    # ── Meta half from existing Metabase questions ────────────────────────
+    meta_rev, meta_spend, meta_cpa, wi_label = {}, {}, {}, {}
+    try:
+        rev_rows = fetch_question(slide_cfg["meta_revenue_q"], url_env, key_env)     # week, week_idx, total_revenue
+        spend_rows = fetch_question(slide_cfg["meta_spend_q"], url_env, key_env)     # week_idx, spend
+        cpa_rows = fetch_question(slide_cfg["meta_cpa_q"], url_env, key_env)         # week, cpa
+        label2wi = {}
+        for r in rev_rows:
+            wi = _q_num(r.get("week_idx"))
+            if wi is None:
+                continue
+            wi = int(wi)
+            meta_rev[wi] = _q_num(r.get("total_revenue")) or 0.0
+            wi_label[wi] = str(r.get("week", ""))
+            label2wi[str(r.get("week", ""))] = wi
+        for r in spend_rows:
+            wi = _q_num(r.get("week_idx"))
+            if wi is not None:
+                meta_spend[int(wi)] = _q_num(r.get("spend")) or 0.0
+        for r in cpa_rows:
+            wi = label2wi.get(str(r.get("week", "")))
+            if wi is not None:
+                meta_cpa[wi] = _q_num(r.get("cpa")) or 0.0
+    except Exception as exc:
+        errors.append(f"meta questions: {exc}")
+
+    # ── Google half + Meta immediate revenue, live from db 74 ─────────────
+    g_rev, g_reg, g_spend, m_imm = {}, {}, {}, {}
+    try:
+        for x in execute_sql(_g_cohort_rev_sql(anchor), db, url_env, key_env):
+            wi = _q_num(x.get("widx"))
+            if wi is not None:
+                g_rev[int(wi)] = {"revenue": _q_num(x.get("revenue")) or 0.0,
+                                  "imm_rev": _q_num(x.get("imm_rev")) or 0.0}
+        for x in execute_sql(_g_cohort_reg_sql(anchor), db, url_env, key_env):
+            wi = _q_num(x.get("widx"))
+            if wi is not None:
+                g_reg[int(wi)] = _q_num(x.get("registrations")) or 0.0
+        for x in execute_sql(_meta_cohort_imm_sql(anchor), db, url_env, key_env):
+            wi = _q_num(x.get("widx"))
+            if wi is not None:
+                m_imm[int(wi)] = _q_num(x.get("imm_rev")) or 0.0
+        g_spend = _google_daily_spend_by_cohort(anchor)
+    except Exception as exc:
+        errors.append(f"google/live: {exc}")
+
+    # ── Combine per cohort week, drop the current partial week ────────────
+    today_wi = (datetime.date.today() - datetime.date.fromisoformat(anchor)).days // 7
+    all_wi = sorted(w for w in (set(meta_rev) | set(meta_spend) | set(g_rev) | set(g_reg) | set(g_spend))
+                    if w < today_wi)
+    if last_n:
+        all_wi = all_wi[-last_n:]
+
+    labels, spend_s, rev_s, reg_s, immrate_s = [], [], [], [], []
+    for w in all_wi:
+        tot_spend = meta_spend.get(w, 0.0) + g_spend.get(w, 0.0)
+        tot_rev = meta_rev.get(w, 0.0) + g_rev.get(w, {}).get("revenue", 0.0)
+        meta_reg = (meta_spend.get(w, 0.0) / meta_cpa[w]) if meta_cpa.get(w) else 0.0
+        regs = meta_reg + g_reg.get(w, 0.0)
+        imm = m_imm.get(w, 0.0) + g_rev.get(w, {}).get("imm_rev", 0.0)
+        labels.append(wi_label.get(w) or _cohort_label(anchor, w))
+        spend_s.append(round(tot_spend, 2))
+        rev_s.append(round(tot_rev, 2))
+        reg_s.append(round(regs))
+        immrate_s.append(round(imm / tot_spend * 100, 2) if tot_spend else 0)
+
+    charts = [
+        {"label": "Total Spending & Total Revenue", "labels": labels, "format": "currency",
+         "series": [
+             {"label": "Total Spending", "data": spend_s, "color": "#4A90D9"},
+             {"label": "Total Revenue",  "data": rev_s,   "color": "#E0533D"},
+         ]},
+        {"label": "Registrations", "labels": labels, "data": reg_s,
+         "format": "number", "color": "#4A90D9"},
+        {"label": "Imm. Return Rate", "labels": labels, "data": immrate_s,
+         "format": "percent", "color": "#4A90D9"},
+    ]
+    print(f"  [OK]   '{title}' — {len(labels)} weeks; "
+          f"spend peak {max(spend_s or [0]):.0f}, rev peak {max(rev_s or [0]):.0f}, "
+          f"reg peak {max(reg_s or [0]):.0f}, immrate peak {max(immrate_s or [0]):.0f}%")
+    return {
+        "title": title,
+        "render": "dual_line_chart",
+        "id": slide_cfg.get("id", "combined_re_mb"),
+        "platform_icon": slide_cfg.get("platform_icon", ""),
+        "charts": charts,
+        "skipped": False,
+        "error": "; ".join(errors) if errors else None,
+    }
+
+
 # ── Region table slide ───────────────────────────────────────────────────────
 
 def _date_params(start: str, end: str) -> list:
@@ -746,6 +936,8 @@ def build():
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render == "branded_search":
                 slides_data.append(build_branded_search_slide(slide_cfg, url_env, key_env, week_start, week_end))
+            elif render == "combined_re_mb":
+                slides_data.append(build_combined_re_mb_slide(slide_cfg, url_env, key_env))
             elif render in ("dual_line_chart", "line_chart"):
                 slides_data.append(build_chart_slide(slide_cfg, url_env, key_env))
             elif render == "region_table":

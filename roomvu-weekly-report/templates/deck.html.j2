@@ -503,32 +503,39 @@
             <script>
             (function(){
               var labels = {{ chart['labels'] | tojson }};
-              var values = {{ chart['data'] | tojson }};
               var fmt   = {{ chart.format | tojson }};
-              var color = {{ chart.color | tojson }};
+              {% if chart.series is defined %}
+              var series = {{ chart.series | tojson }};
+              {% else %}
+              var series = [{ "label": {{ chart.label | tojson }}, "data": {{ chart['data'] | tojson }}, "color": {{ chart.color | tojson }} }];
+              {% endif %}
+              var datasets = series.map(function(s){
+                return {
+                  label: s.label,
+                  data: s.data,
+                  borderColor: s.color,
+                  backgroundColor: s.color + '22',
+                  pointBackgroundColor: s.color,
+                  pointRadius: 3,
+                  pointHoverRadius: 5,
+                  borderWidth: 2,
+                  tension: 0.1,
+                  fill: false,
+                };
+              });
               var ctx = document.getElementById('chart-{{ slide.id | default(loop.index0) }}-{{ loop.index0 }}');
               new Chart(ctx, {
                 type: 'line',
                 data: {
                   labels: labels,
-                  datasets: [{
-                    data: values,
-                    borderColor: color,
-                    backgroundColor: color + '22',
-                    pointBackgroundColor: color,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    borderWidth: 2,
-                    tension: 0.1,
-                    fill: false,
-                  }]
+                  datasets: datasets
                 },
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
                   animation: false,
                   plugins: {
-                    legend: { display: false },
+                    legend: { display: series.length > 1, position: 'top', labels: { font: { size: 10, family: 'Inter' }, usePointStyle: true, boxWidth: 8 } },
                     tooltip: {
                       callbacks: {
                         label: function(ctx) {
