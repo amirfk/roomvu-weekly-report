@@ -507,11 +507,11 @@ WHERE ({where}) AND u.created_at >= '{ws}' AND u.created_at < '{we}'
             _q_num(r.get("immediate")) or 0.0)
 
 
-def _fin_row_spend(row, ws, wi):
+def _fin_row_spend(row, ws, wi, url_env=None, key_env=None):
     """Weekly spend for a row from its configured source; None if no live source
     (funnel-stage gaps). ws/wi = week start / inclusive end (ISO dates)."""
     if row.get("spend_q"):
-        r = _first_row(fetch_question(row["spend_q"]))
+        r = _first_row(fetch_question(row["spend_q"], url_env, key_env))
         for k in ("Cost", "cost", "amount_spent", "Amount_Spent", "spend", "Spend"):
             if k in r:
                 return _q_num(r[k])
@@ -555,7 +555,7 @@ def build_financial_report_slide(slide_cfg, url_env, key_env, week_start, week_e
             except Exception as exc:
                 errors.append(f"{row.get('channel')}: {exc}")
         try:
-            spend = _fin_row_spend(row, ws, wi)
+            spend = _fin_row_spend(row, ws, wi, url_env, key_env)
         except Exception as exc:
             spend = None
             errors.append(f"{row.get('channel')} spend: {exc}")
