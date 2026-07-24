@@ -340,37 +340,41 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
 
 # ── Google Ads revenue SQL (run via execute_sql against db 74) ────────────────
 
+# Revenue is grouped by PAYMENT week (cash received that week), matching the
+# marketing team's "Data Feed" sheet. Weeks are Mon-Sun ISO, same as
+# Supermetrics Yearweekiso. The current (incomplete) week is excluded.
 _GOOGLE_TOTAL_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  CONCAT(YEAR(f.created_at), '|', LPAD(WEEK(f.created_at, 3), 2, '0')) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
   ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS total_revenue
 FROM users u
 JOIN financials f ON f.user_id = u.id
-WHERE u.user_type_id != 1
-  AND u.utm_source IN ('google', 'google-ads')
+WHERE u.utm_source IN ('google', 'google-ads')
   AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
   AND f.amount >= 1.0
-  AND u.created_at >= '2025-01-01'
+  AND f.created_at >= '2025-01-01'
+  AND f.created_at < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
 
+# Immediate revenue: payments received in the same ISO week the user registered.
 _GOOGLE_IMM_REVENUE_SQL = """
 SELECT
-  CONCAT(YEAR(u.created_at), '|', WEEK(u.created_at, 3)) AS week_idx,
-  CONCAT(DATE_FORMAT(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), '%d %b'), ' - ',
-         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(u.created_at), INTERVAL WEEKDAY(u.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
+  CONCAT(YEAR(f.created_at), '|', LPAD(WEEK(f.created_at, 3), 2, '0')) AS week_idx,
+  CONCAT(DATE_FORMAT(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), '%d %b'), ' - ',
+         DATE_FORMAT(DATE_ADD(DATE_SUB(DATE(f.created_at), INTERVAL WEEKDAY(f.created_at) DAY), INTERVAL 6 DAY), '%d %b')) AS week,
   ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS imm_revenue
 FROM users u
 JOIN financials f ON f.user_id = u.id
-WHERE u.user_type_id != 1
-  AND u.utm_source IN ('google', 'google-ads')
+WHERE u.utm_source IN ('google', 'google-ads')
   AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
   AND f.amount >= 1.0
-  AND f.created_at <= DATE_ADD(u.created_at, INTERVAL 7 DAY)
-  AND u.created_at >= '2025-01-01'
+  AND YEARWEEK(f.created_at, 3) = YEARWEEK(u.created_at, 3)
+  AND f.created_at >= '2025-01-01'
+  AND f.created_at < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
 GROUP BY week_idx, week
 ORDER BY week_idx
 """.strip()
@@ -422,8 +426,12 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         }
         sql = sql_map.get(num_sql, num_sql)
         num_rows = execute_sql(sql, database_id, url_env, key_env)
-        # Denominator: Google Ads weekly spend from Supermetrics
-        spend_rows = sm.fetch_google_ads(["Yearweekiso", "Cost"], date_range_type="last_year_inc")
+        # Denominator: Google Ads weekly spend from Supermetrics, per campaign.
+        # spend_basis "acquisition" keeps only the campaigns in
+        # acquisition_campaign_ids (PPC/Competitors — the marketing sheet's
+        # "Total Spending (Acquisition)"); "total" sums the whole account.
+        spend_rows = sm.fetch_google_ads(["Yearweekiso", "Campaignid", "Cost"],
+                                         date_range_type="last_year_inc")
         def _norm_yw(v):
             s = str(v)
             if '|' in s:
@@ -431,7 +439,14 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
                 return f"{y}|{int(w)}"
             return s
 
-        spend_map  = {_norm_yw(r.get("Yearweekiso", "")): float(r.get("Cost", 0) or 0) for r in spend_rows}
+        acq_ids = {str(c) for c in chart_cfg.get("acquisition_campaign_ids", [])}
+        basis   = chart_cfg.get("spend_basis", "total")
+        spend_map = {}
+        for r in spend_rows:
+            if basis == "acquisition" and str(r.get("Campaignid", "")) not in acq_ids:
+                continue
+            wk = _norm_yw(r.get("Yearweekiso", ""))
+            spend_map[wk] = spend_map.get(wk, 0.0) + float(r.get("Cost", 0) or 0)
 
         labels = []
         values = []

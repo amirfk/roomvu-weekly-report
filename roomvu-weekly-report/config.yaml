@@ -164,6 +164,11 @@ slides:
     tot_subs_database_id: 74   # roomvu_ads_metrics — all-time active subs per region
 
   # ── Google Ads slides (Supermetrics + Metabase) ────────────────
+  # Matches the marketing team's "New Ads Report Structure - Data Feed" sheet:
+  #   Total Return Rate = revenue received that week / acquisition spend
+  #   Imm Revenue Rate  = same-week-registration revenue / total spend
+  # Acquisition = PPC Social Media + PPC Video + Competitors family
+  # (excludes Brand, Demand Gen, Display/Remarketing, Bumper, YT Views).
   - id: google_all_campaigns
     title: "Google - All campaigns"
     render: dual_line_chart
@@ -177,6 +182,15 @@ slides:
         x_field: week
         format: percent
         color: "#4A90D9"
+        spend_basis: acquisition
+        acquisition_campaign_ids:
+          - "16587957261"   # RV - Registration - PPC Social Media
+          - "17809534029"   # RV - Registration - PPC Video
+          - "17948075953"   # RV - Registration - Competitors
+          - "22265795515"   # RV - Registration - Competitors [IDX]
+          - "22440586485"   # RV - Registration - Competitors [Real Geeks]
+          - "23737726709"   # RV - Registration - Competitors [Insurance Agent]
+          - "23735196152"   # RV - Registration - Competitors [Financial Advisor]
       - label: "Immediate Revenue Rate"
         source: google_ads_ratio
         database_id: 74
@@ -185,5 +199,6 @@ slides:
         x_field: week
         format: percent
         color: "#E8956D"
+        spend_basis: total
 
 fixed_columns: [week_idx, week, Registration, Amount_Spent]
