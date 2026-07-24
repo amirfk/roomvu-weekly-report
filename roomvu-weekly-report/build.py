@@ -510,12 +510,19 @@ WHERE ({where}) AND u.created_at >= '{ws}' AND u.created_at < '{we}'
 def _fin_row_spend(row, ws, wi, url_env=None, key_env=None):
     """Weekly spend for a row from its configured source; None if no live source
     (funnel-stage gaps). ws/wi = week start / inclusive end (ISO dates)."""
-    if row.get("spend_q"):
-        r = _first_row(fetch_question(row["spend_q"], url_env, key_env))
+    def _q_spend(qid):
+        r = _first_row(fetch_question(qid, url_env, key_env))
         for k in ("Cost", "cost", "amount_spent", "Amount_Spent", "spend", "Spend"):
             if k in r:
                 return _q_num(r[k])
         return None
+
+    if row.get("spend_q"):
+        return _q_spend(row["spend_q"])
+    if row.get("spend_q_sum"):
+        vals = [_q_spend(q) for q in row["spend_q_sum"]]
+        vals = [v for v in vals if v is not None]
+        return round(sum(vals), 2) if vals else None
     if row.get("spend_google_campaigns"):
         ids = {str(c) for c in row["spend_google_campaigns"]}
         total = 0.0

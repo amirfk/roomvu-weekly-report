@@ -296,6 +296,7 @@ slides:
       - goal: Acquisition
         channel: Facebook
         fb_campaigns: ["120231753483890603", "120233281815980603"]   # RE&MB
+        spend_q_sum: [8335, 8333]   # Realtor spend + Mortgage spend (KPI questions)
       - goal: Acquisition
         channel: Google
         google: true
