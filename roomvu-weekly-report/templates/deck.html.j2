@@ -264,6 +264,24 @@
       min-height: 260px;
     }
     .kpi-creative img { width: 100%; height: auto; display: block; }
+    /* Google search-ad preview card */
+    .ad-preview {
+      width: 100%;
+      text-align: left;
+      background: #f6faf4;
+      border: 1px solid #cfe3c8;
+      border-radius: 10px;
+      padding: 18px 20px;
+      font-size: .82em;
+      line-height: 1.35;
+    }
+    .ad-head { color: var(--gray600); margin-bottom: 8px; font-size: .95em; }
+    .ad-tag { font-weight: 700; color: #202124; }
+    .ad-headline { color: #1a0dab; font-size: 1.35em; font-weight: 600; margin-bottom: 6px; }
+    .ad-desc { color: #4d5156; margin-bottom: 14px; }
+    .ad-sitelinks { display: flex; gap: 28px; }
+    .ad-sitelink-title { color: #1a0dab; font-weight: 600; margin-bottom: 3px; }
+    .ad-sitelink-line { color: var(--gray600); font-size: .92em; }
     .kpi-creative .no-creative {
       color: var(--gray600);
       font-size: .8em;
@@ -449,7 +467,23 @@
             {% endfor %}
           </div>
           <div class="kpi-creative">
-            {% if slide.creative_url %}
+            {% if slide.ad_preview %}
+            <div class="ad-preview">
+              <div class="ad-head"><span class="ad-tag">Ad</span> · {{ slide.ad_preview.url }} ▾</div>
+              <div class="ad-headline">{{ slide.ad_preview.headline }}</div>
+              <div class="ad-desc">{{ slide.ad_preview.description }}</div>
+              {% if slide.ad_preview.sitelinks %}
+              <div class="ad-sitelinks">
+                {% for sl in slide.ad_preview.sitelinks %}
+                <div class="ad-sitelink">
+                  <div class="ad-sitelink-title">{{ sl.title }}</div>
+                  {% for line in sl.lines %}<div class="ad-sitelink-line">{{ line }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% elif slide.creative_url %}
             <img src="{{ slide.creative_url }}" alt="Ad creative" />
             {% else %}
             <span class="no-creative">No creative configured</span>

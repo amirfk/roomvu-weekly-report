@@ -185,6 +185,108 @@ def build_meta_kpi_slide(slide_cfg, url_env, key_env):
     }
 
 
+# ── Branded Search KPI slide (Google brand campaign, single Wed–Tue week) ──────
+
+def build_branded_search_slide(slide_cfg, url_env, key_env, week_start, week_end):
+    """Single-week KPI snapshot for the Google branded-search campaign.
+
+    Clicks/Cost come from Supermetrics (brand campaign only); Registrations and
+    revenue from Metabase. Window is the latest complete Wed–Tue cohort week
+    [week_start .. week_end] inclusive — same window the deck header uses.
+    """
+    title = slide_cfg["title"]
+    campaign_id = str(slide_cfg.get("campaign_id", "11179321084"))  # Roomvu Brand
+    database_id = slide_cfg.get("database_id", 74)
+    ws = week_start.isoformat()                                     # Wed (inclusive)
+    wi = week_end.isoformat()                                       # Tue (Supermetrics end, inclusive)
+    we = (week_end + datetime.timedelta(days=1)).isoformat()        # next Wed (SQL exclusive)
+
+    errors = []
+
+    # Supermetrics: clicks + cost for the brand campaign over the window.
+    clicks = 0.0
+    cost = 0.0
+    try:
+        for r in sm.fetch_google_ads(["Campaignid", "Clicks", "Cost"],
+                                     start_date=ws, end_date=wi):
+            if str(r.get("Campaignid", "")) == campaign_id:
+                clicks += float(r.get("Clicks", 0) or 0)
+                cost += float(r.get("Cost", 0) or 0)
+    except Exception as exc:
+        errors.append(f"supermetrics: {exc}")
+
+    # Metabase: registrations attributed to the brand campaign, registered in-window.
+    registrations = None
+    try:
+        reg_sql = f"""
+SELECT COUNT(*) AS registrations
+FROM users u
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND SUBSTR(u.utm_campaign, 1, POSITION('-' IN u.utm_campaign)-1) = '{campaign_id}'
+  AND u.created_at >= '{ws}' AND u.created_at < '{we}'
+""".strip()
+        registrations = float(_first_row(execute_sql(reg_sql, database_id, url_env, key_env))
+                              .get("registrations", 0) or 0)
+    except Exception as exc:
+        errors.append(f"registrations: {exc}")
+
+    # Metabase: revenue paid in-window by brand-campaign users.
+    #   Tot = subscriptions in full + 30% of Smart Ads (same split as the charts).
+    #   Imm = subscription payments from users who also registered in-window.
+    tot_revenue = imm_revenue = None
+    try:
+        rev_sql = f"""
+SELECT
+  ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount*1.3)
+            * IF(f.morph_type LIKE 'SMART_AD%', 0.3, 1)), 2) AS tot_revenue,
+  ROUND(SUM(IF(f.morph_type LIKE 'SUBSCRIPTION%'
+               AND u.created_at >= '{ws}' AND u.created_at < '{we}',
+               IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS imm_revenue
+FROM users u
+JOIN financials f ON f.user_id = u.id
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND SUBSTR(u.utm_campaign, 1, POSITION('-' IN u.utm_campaign)-1) = '{campaign_id}'
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND (f.morph_type LIKE 'SUBSCRIPTION%' OR f.morph_type LIKE 'SMART_AD%')
+  AND f.amount >= 1.0
+  AND f.created_at >= '{ws}' AND f.created_at < '{we}'
+""".strip()
+        rev = _first_row(execute_sql(rev_sql, database_id, url_env, key_env))
+        tot_revenue = float(rev.get("tot_revenue", 0) or 0)
+        imm_revenue = float(rev.get("imm_revenue", 0) or 0)
+    except Exception as exc:
+        errors.append(f"revenue: {exc}")
+
+    cpa = None
+    if registrations:
+        cpa = round(cost / registrations, 2)
+
+    kpis = [
+        {"label": "Clicks",        "value": _fmt_number(clicks)},
+        {"label": "Registrations", "value": _fmt_number(registrations)},
+        {"label": "Cost",          "value": _fmt_currency(cost)},
+        {"label": "CPA",           "value": _fmt_currency(cpa)},
+        {"label": "Im. Revenue",   "value": _fmt_currency(imm_revenue) if imm_revenue else "$-"},
+        {"label": "Tot. Revenue",  "value": _fmt_currency(tot_revenue)},
+    ]
+
+    creative_url = slide_cfg.get("creative_url", "")
+    if not creative_url and slide_cfg.get("creative_file"):
+        creative_url = f"roomvu-weekly-report/assets/creatives/{slide_cfg['creative_file']}"
+
+    print(f"  [OK]   '{title}' — KPIs: {kpis}")
+    return {
+        "title": title,
+        "render": "meta_kpi",
+        "platform": slide_cfg.get("platform", "google"),
+        "creative_url": creative_url,
+        "ad_preview": slide_cfg.get("ad_preview"),
+        "kpis": kpis,
+        "skipped": False,
+        "error": "; ".join(errors) if errors else None,
+    }
+
+
 # ── Region table slide ───────────────────────────────────────────────────────
 
 def _date_params(start: str, end: str) -> list:
@@ -642,6 +744,8 @@ def build():
                 slides_data.append(build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols))
             elif render == "meta_kpi":
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
+            elif render == "branded_search":
+                slides_data.append(build_branded_search_slide(slide_cfg, url_env, key_env, week_start, week_end))
             elif render in ("dual_line_chart", "line_chart"):
                 slides_data.append(build_chart_slide(slide_cfg, url_env, key_env))
             elif render == "region_table":

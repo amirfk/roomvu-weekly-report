@@ -226,4 +226,21 @@ slides:
         last_weeks: 46
         spend_basis: total
 
+  # ── Branded Search (Roomvu Brand campaign) — single-week KPI snapshot ──
+  - id: google_branded_search
+    title: "Branded Search"
+    render: branded_search
+    platform_icon: google
+    campaign_id: "11179321084"   # Roomvu Brand
+    database_id: 74
+    ad_preview:
+      url: "www.roomvu.com/"
+      headline: "Roomvu Video Content Factory - Real Estate Marketing Toolkit"
+      description: "Share Branded Real Estate Videos with roomvu. Insightful Videos for You to Convert Leads."
+      sitelinks:
+        - title: "Latest Market Updates"
+          lines: ["Pulled from Local Boards", "Geographically Relevant"]
+        - title: "Custom Brokerage Videos"
+          lines: ["Designed for Your Brokerage", "Branded with Your Contact Info"]
+
 fixed_columns: [week_idx, week, Registration, Amount_Spent]
