@@ -263,4 +263,59 @@ slides:
       - "120231753483890603"   # Realtor
       - "120233281815980603"   # Mortgage Broker
 
+  # ── Financial report (Financial & Insurance Agents) — single-week table ──
+  # Total Revenue = registration-cohort subs + full SmartAd (succeeded), to date.
+  # Insurance's reference $6,449 is a stale hand-entered cell — the automated
+  # value is the true ~$2.4k. Meta segment spend from the KPI spend questions.
+  - id: fin_report_fin_insurance
+    title: "Financial report (Financial & Insurance Agents)"
+    render: financial_report
+    database_id: 74
+    per_row_revenue: true
+    note: "Heads-up: Insurance had a 62% charge-failure rate this week (5 of 8 subscription attempts failed) — worth a billing check."
+    rows:
+      - goal: Acquisition
+        channel: "FB (Insurance)"
+        spend_q: 8331
+        fb_campaigns: ["120233992944810603", "120218175521230626", "120227402303430626"]
+      - goal: Acquisition
+        channel: "FB (Financial)"
+        spend_q: 8336
+        fb_campaigns: ["120250806358890603", "120236934764070603"]
+
+  # ── Financial report – Real Estate & MB — single-week table ──
+  # Revenue/Imm-Return shown as acquisition aggregate (per_row_revenue: false).
+  # Meta funnel-stage spend (FB Acquisition/Retargeting/Awareness, Tests) has no
+  # live source -> shown as "—". Google/LinkedIn spend live via Supermetrics.
+  - id: fin_report_re_mb
+    title: "Financial report – Real Estate & MB"
+    render: financial_report
+    database_id: 74
+    per_row_revenue: false
+    rows:
+      - goal: Acquisition
+        channel: Facebook
+        fb_campaigns: ["120231753483890603", "120233281815980603"]   # RE&MB
+      - goal: Acquisition
+        channel: Google
+        google: true
+        spend_google_campaigns:                # Google acquisition campaigns
+          - "16587957261"   # PPC Social Media
+          - "17809534029"   # PPC Video
+          - "17948075953"   # Competitors
+          - "22265795515"
+          - "22440586485"
+          - "23737726709"
+          - "23735196152"
+      - {goal: Acquisition, channel: Retargeting}          # Meta funnel — no live source
+      - {goal: Acquisition, channel: LinkedIn, spend_linkedin: true}
+      - {goal: Tests, channel: "Demand + Open AI"}         # no clean live source
+      - {goal: Awareness, channel: Facebook}               # Meta funnel — no live source
+      - goal: Awareness
+        channel: Google
+        spend_google_campaigns:                # Google brand / awareness
+          - "11179321084"   # Roomvu Brand
+          - "20984261490"   # YT Views
+          - "23705925967"   # Bumper Ads [YT]
+
 fixed_columns: [week_idx, week, Registration, Amount_Spent]

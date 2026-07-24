@@ -329,6 +329,20 @@
       height: 100% !important;
     }
 
+    /* ── Financial report table ─────────────────────────────── */
+    .fin-report { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    table.fin-table { width: 100%; border-collapse: collapse; font-size: .95em; }
+    table.fin-table th {
+      background: var(--navy); color: #fff; font-weight: 600;
+      padding: 12px 16px; text-align: left; font-size: .9em;
+    }
+    table.fin-table td { padding: 11px 16px; border: 1px solid var(--gray200); }
+    table.fin-table td.fin-num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.fin-table td.fin-goal { font-weight: 600; color: var(--navy); }
+    table.fin-table tr.fin-total td { font-weight: 700; background: var(--gray100); border-top: 2px solid var(--navy); }
+    table.fin-table tr.fin-summary td { font-weight: 600; color: var(--gray600); background: #fafafa; }
+    .fin-note { margin-top: 14px; font-size: .8em; color: #b4513b; font-style: italic; }
+
     /* ── Region table slide ─────────────────────────────────── */
     .region-tables { display: flex; flex-direction: column; gap: 14px; flex: 1; overflow: auto; }
     .region-period-label {
@@ -489,6 +503,51 @@
             <span class="no-creative">No creative configured</span>
             {% endif %}
           </div>
+        </div>
+
+        {% elif slide.render == 'financial_report' %}
+        <div class="fin-report">
+          <table class="fin-table">
+            <thead>
+              <tr>
+                <th>Goal</th><th>Channel</th><th>Amount Spent</th>
+                {% if slide.per_row_revenue %}<th>Total Revenue</th><th>Imm Return</th>{% endif %}
+                <th>#Registration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in slide.rows %}
+              <tr>
+                <td class="fin-goal">{{ r.goal }}</td>
+                <td>{{ r.channel }}</td>
+                <td class="fin-num">{{ r.spend }}</td>
+                {% if slide.per_row_revenue %}
+                <td class="fin-num">{{ r.revenue }}</td>
+                <td class="fin-num">{{ r.imm_return }}</td>
+                {% endif %}
+                <td class="fin-num">{{ r.registration }}</td>
+              </tr>
+              {% endfor %}
+              <tr class="fin-total">
+                <td colspan="2">Total</td>
+                <td class="fin-num">{{ slide.totals.spend }}</td>
+                {% if slide.per_row_revenue %}
+                <td class="fin-num">{{ slide.totals.revenue }}</td>
+                <td class="fin-num">{{ slide.totals.imm_return }}</td>
+                {% else %}
+                {% endif %}
+                <td class="fin-num">{{ slide.totals.registration }}</td>
+              </tr>
+              {% if not slide.per_row_revenue %}
+              <tr class="fin-summary">
+                <td colspan="2">Acquisition totals</td>
+                <td class="fin-num">Rev {{ slide.totals.revenue }}</td>
+                <td class="fin-num" colspan="{{ 2 if slide.per_row_revenue else 1 }}">Imm Return {{ slide.totals.imm_return }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+          {% if slide.note %}<p class="fin-note">{{ slide.note }}</p>{% endif %}
         </div>
 
         {% elif slide.render in ('dual_line_chart', 'line_chart') %}

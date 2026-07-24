@@ -466,6 +466,132 @@ def build_combined_re_mb_slide(slide_cfg, url_env, key_env):
     }
 
 
+# ── Financial-report summary tables (single Wed–Tue week, by channel/segment) ──
+# "Total Revenue" = registration-cohort revenue (users who registered in the
+# week) counting subscriptions + SmartAds at FULL value, succeeded charges,
+# accumulated to date. Verified: Financial $1,512 exact, RE&MB $6,856 (~ref
+# $6,696). Stale reference cells (e.g. Insurance $6,449) are NOT reproduced —
+# the automated number is the correct current value.
+
+def _fin_seg_where(row):
+    """WHERE fragment for a financial-report row's segment."""
+    if row.get("google"):
+        return "u.utm_source IN ('google','google-ads')"
+    ids = row.get("fb_campaigns")
+    if ids:
+        idlist = ",".join(f"'{c}'" for c in ids)
+        return ("u.utm_source='facebook' AND u.utm_medium='paidsocial' "
+                f"AND SUBSTR(u.utm_campaign,1,POSITION('-' IN u.utm_campaign)-1) IN ({idlist})")
+    return None
+
+
+def _fin_seg_metrics(where, ws, we, db, url_env, key_env):
+    """(registrations, total_revenue, immediate) for a segment cohort registered
+    in [ws, we). total_revenue = subs + full SmartAd (succeeded), to date."""
+    sql = f"""
+SELECT
+  COUNT(DISTINCT u.id) AS registrations,
+  ROUND(SUM(IF(f.morph_type LIKE 'SUBSCRIPTION%' OR f.morph_type LIKE 'SMART_AD%',
+             IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS total_revenue,
+  ROUND(SUM(IF(f.morph_type LIKE 'SUBSCRIPTION%' AND f.created_at >= '{ws}' AND f.created_at < '{we}',
+             IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS immediate
+FROM users u
+LEFT JOIN financials f ON f.user_id = u.id
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.amount >= 1.0
+WHERE ({where}) AND u.created_at >= '{ws}' AND u.created_at < '{we}'
+""".strip()
+    r = _first_row(execute_sql(sql, db, url_env, key_env))
+    return (_q_num(r.get("registrations")) or 0,
+            _q_num(r.get("total_revenue")) or 0.0,
+            _q_num(r.get("immediate")) or 0.0)
+
+
+def _fin_row_spend(row, ws, wi):
+    """Weekly spend for a row from its configured source; None if no live source
+    (funnel-stage gaps). ws/wi = week start / inclusive end (ISO dates)."""
+    if row.get("spend_q"):
+        r = _first_row(fetch_question(row["spend_q"]))
+        for k in ("Cost", "cost", "amount_spent", "Amount_Spent", "spend", "Spend"):
+            if k in r:
+                return _q_num(r[k])
+        return None
+    if row.get("spend_google_campaigns"):
+        ids = {str(c) for c in row["spend_google_campaigns"]}
+        total = 0.0
+        for x in sm.fetch_google_ads(["Campaignid", "Cost"], start_date=ws, end_date=wi):
+            if str(x.get("Campaignid", "")) in ids:
+                total += float(x.get("Cost", 0) or 0)
+        return round(total, 2)
+    if row.get("spend_linkedin"):
+        total = 0.0
+        for x in sm.fetch_linkedin_ads(["Cost"], start_date=ws, end_date=wi):
+            total += float(x.get("Cost", 0) or 0)
+        return round(total, 2)
+    return None  # no live source → data gap
+
+
+def build_financial_report_slide(slide_cfg, url_env, key_env, week_start, week_end):
+    title = slide_cfg["title"]
+    db = slide_cfg.get("database_id", 74)
+    ws = week_start.isoformat()
+    wi = week_end.isoformat()                                  # inclusive Tue (Supermetrics)
+    we = (week_end + datetime.timedelta(days=1)).isoformat()   # exclusive (SQL)
+    per_row_rev = slide_cfg.get("per_row_revenue", True)
+    errors = []
+
+    rows_out = []
+    tot_spend = tot_rev = tot_imm = 0.0
+    tot_reg = 0
+    for row in slide_cfg["rows"]:
+        where = _fin_seg_where(row)
+        reg = rev = imm = None
+        if where:
+            try:
+                reg, rev, imm = _fin_seg_metrics(where, ws, we, db, url_env, key_env)
+                tot_reg += int(reg)
+                tot_rev += rev
+                tot_imm += imm
+            except Exception as exc:
+                errors.append(f"{row.get('channel')}: {exc}")
+        try:
+            spend = _fin_row_spend(row, ws, wi)
+        except Exception as exc:
+            spend = None
+            errors.append(f"{row.get('channel')} spend: {exc}")
+        if spend:
+            tot_spend += spend
+        imm_return = (round(imm / spend * 100) if (imm is not None and spend) else None)
+        rows_out.append({
+            "goal": row.get("goal", ""),
+            "channel": row.get("channel", ""),
+            "spend": _fmt_currency(spend) if spend is not None else "—",
+            "revenue": (_fmt_currency(rev) if (per_row_rev and rev is not None) else ""),
+            "imm_return": (f"{imm_return}%" if (per_row_rev and imm_return is not None) else ""),
+            "registration": (_fmt_number(reg) if reg is not None else "—"),
+        })
+
+    totals = {
+        "spend": _fmt_currency(tot_spend),
+        "revenue": _fmt_currency(tot_rev),
+        "imm_return": (f"{round(tot_imm / tot_spend * 100)}%" if tot_spend else "—"),
+        "registration": _fmt_number(tot_reg),
+    }
+    print(f"  [OK]   '{title}' — {len(rows_out)} rows; total reg {tot_reg}, "
+          f"total rev {tot_rev:.0f}, spend {tot_spend:.0f}")
+    return {
+        "title": title,
+        "render": "financial_report",
+        "id": slide_cfg.get("id", "financial_report"),
+        "per_row_revenue": per_row_rev,
+        "rows": rows_out,
+        "totals": totals,
+        "note": slide_cfg.get("note", ""),
+        "skipped": False,
+        "error": "; ".join(errors) if errors else None,
+    }
+
+
 # ── Region table slide ───────────────────────────────────────────────────────
 
 def _date_params(start: str, end: str) -> list:
@@ -927,6 +1053,8 @@ def build():
                 slides_data.append(build_branded_search_slide(slide_cfg, url_env, key_env, week_start, week_end))
             elif render == "combined_re_mb":
                 slides_data.append(build_combined_re_mb_slide(slide_cfg, url_env, key_env))
+            elif render == "financial_report":
+                slides_data.append(build_financial_report_slide(slide_cfg, url_env, key_env, week_start, week_end))
             elif render in ("dual_line_chart", "line_chart"):
                 slides_data.append(build_chart_slide(slide_cfg, url_env, key_env))
             elif render == "region_table":
