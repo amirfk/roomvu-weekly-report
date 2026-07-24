@@ -303,7 +303,10 @@ def _cohort_label(anchor_str, widx):
     return f"{start.strftime('%-d %b')} - {end.strftime('%-d %b')}".replace(" 0", " ")
 
 
-def _g_cohort_rev_sql(anchor):
+def _cohort_rev_sql(anchor, where):
+    """Revenue (subs + 0.3*SmartAds) and immediate revenue by PAYMENT cohort week
+    for the users matched by `where`. Imm = subscription paid in the same cohort
+    week the user registered."""
     return f"""
 WITH anchor AS (SELECT DATE '{anchor}' AS d)
 SELECT
@@ -314,7 +317,7 @@ SELECT
              AND FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) = FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7),
              IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS imm_rev
 FROM users u JOIN financials f ON f.user_id = u.id
-WHERE u.utm_source IN ('google','google-ads')
+WHERE ({where})
   AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
   AND (f.morph_type LIKE 'SUBSCRIPTION%' OR f.morph_type LIKE 'SMART_AD%')
   AND f.amount >= 1.0
@@ -323,34 +326,25 @@ GROUP BY widx
 """.strip()
 
 
-def _g_cohort_reg_sql(anchor):
+def _cohort_reg_sql(anchor, where):
+    """Registrations by REGISTRATION cohort week for users matched by `where`."""
     return f"""
 WITH anchor AS (SELECT DATE '{anchor}' AS d)
 SELECT FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) AS widx, COUNT(*) AS registrations
 FROM users u
-WHERE u.utm_source IN ('google','google-ads') AND u.created_at >= '{anchor}'
+WHERE ({where}) AND u.created_at >= '{anchor}'
 GROUP BY widx
 """.strip()
 
 
-def _meta_cohort_imm_sql(anchor):
-    # Meta immediate revenue by cohort week. Uses facebook/paidsocial; this is
-    # broader than the exact RE&MB segment (no campaign filter available live),
-    # so treat the Imm Return Rate chart as approximate until a dedicated
-    # Meta-immediate-revenue question is wired in.
-    return f"""
-WITH anchor AS (SELECT DATE '{anchor}' AS d)
-SELECT FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7) AS widx,
-  ROUND(SUM(IF(FLOOR(DATEDIFF(u.created_at,(SELECT d FROM anchor))/7) = FLOOR(DATEDIFF(f.created_at,(SELECT d FROM anchor))/7),
-             IF(f.currency='CAD', f.amount, f.amount*1.3), 0)), 2) AS imm_rev
-FROM users u JOIN financials f ON f.user_id = u.id
-WHERE u.utm_source = 'facebook' AND u.utm_medium = 'paidsocial'
-  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
-  AND f.morph_type LIKE 'SUBSCRIPTION%'
-  AND f.amount >= 1.0
-  AND f.created_at >= '{anchor}'
-GROUP BY widx
-""".strip()
+# WHERE fragments for the two channels combined on this slide.
+_GOOGLE_WHERE = "u.utm_source IN ('google','google-ads')"
+
+
+def _meta_re_mb_where(campaign_ids):
+    ids = ",".join(f"'{c}'" for c in campaign_ids)
+    return ("u.utm_source = 'facebook' AND u.utm_medium = 'paidsocial' "
+            f"AND SUBSTR(u.utm_campaign,1,POSITION('-' IN u.utm_campaign)-1) IN ({ids})")
 
 
 def _google_daily_spend_by_cohort(anchor_str):
@@ -384,69 +378,64 @@ def build_combined_re_mb_slide(slide_cfg, url_env, key_env):
     anchor = slide_cfg.get("anchor", _META_ANCHOR)
     db = slide_cfg.get("database_id", 74)
     last_n = int(slide_cfg.get("last_weeks", 46))
+    campaign_ids = [str(c) for c in slide_cfg.get("campaign_ids", [])]
     errors = []
 
-    # ── Meta half from existing Metabase questions ────────────────────────
-    meta_rev, meta_spend, meta_cpa, wi_label = {}, {}, {}, {}
+    def _rev_map(where):
+        out = {}
+        for x in execute_sql(_cohort_rev_sql(anchor, where), db, url_env, key_env):
+            wi = _q_num(x.get("widx"))
+            if wi is not None:
+                out[int(wi)] = {"revenue": _q_num(x.get("revenue")) or 0.0,
+                                "imm_rev": _q_num(x.get("imm_rev")) or 0.0}
+        return out
+
+    def _reg_map(where):
+        out = {}
+        for x in execute_sql(_cohort_reg_sql(anchor, where), db, url_env, key_env):
+            wi = _q_num(x.get("widx"))
+            if wi is not None:
+                out[int(wi)] = _q_num(x.get("registrations")) or 0.0
+        return out
+
+    # ── Revenue, immediate revenue, registrations — live, both channels ───
+    meta_rev, google_rev, meta_reg, google_reg = {}, {}, {}, {}
+    google_spend = {}
     try:
-        rev_rows = fetch_question(slide_cfg["meta_revenue_q"], url_env, key_env)     # week, week_idx, total_revenue
-        spend_rows = fetch_question(slide_cfg["meta_spend_q"], url_env, key_env)     # week_idx, spend
-        cpa_rows = fetch_question(slide_cfg["meta_cpa_q"], url_env, key_env)         # week, cpa
-        label2wi = {}
-        for r in rev_rows:
-            wi = _q_num(r.get("week_idx"))
-            if wi is None:
-                continue
-            wi = int(wi)
-            meta_rev[wi] = _q_num(r.get("total_revenue")) or 0.0
-            wi_label[wi] = str(r.get("week", ""))
-            label2wi[str(r.get("week", ""))] = wi
-        for r in spend_rows:
+        meta_where = _meta_re_mb_where(campaign_ids)
+        meta_rev = _rev_map(meta_where)
+        meta_reg = _reg_map(meta_where)
+        google_rev = _rev_map(_GOOGLE_WHERE)
+        google_reg = _reg_map(_GOOGLE_WHERE)
+        google_spend = _google_daily_spend_by_cohort(anchor)
+    except Exception as exc:
+        errors.append(f"live channels: {exc}")
+
+    # ── Meta spend — only non-live metric; from the RE&MB spend question ──
+    meta_spend = {}
+    try:
+        for r in fetch_question(slide_cfg["meta_spend_q"], url_env, key_env):   # week_idx, spend
             wi = _q_num(r.get("week_idx"))
             if wi is not None:
                 meta_spend[int(wi)] = _q_num(r.get("spend")) or 0.0
-        for r in cpa_rows:
-            wi = label2wi.get(str(r.get("week", "")))
-            if wi is not None:
-                meta_cpa[wi] = _q_num(r.get("cpa")) or 0.0
     except Exception as exc:
-        errors.append(f"meta questions: {exc}")
-
-    # ── Google half + Meta immediate revenue, live from db 74 ─────────────
-    g_rev, g_reg, g_spend, m_imm = {}, {}, {}, {}
-    try:
-        for x in execute_sql(_g_cohort_rev_sql(anchor), db, url_env, key_env):
-            wi = _q_num(x.get("widx"))
-            if wi is not None:
-                g_rev[int(wi)] = {"revenue": _q_num(x.get("revenue")) or 0.0,
-                                  "imm_rev": _q_num(x.get("imm_rev")) or 0.0}
-        for x in execute_sql(_g_cohort_reg_sql(anchor), db, url_env, key_env):
-            wi = _q_num(x.get("widx"))
-            if wi is not None:
-                g_reg[int(wi)] = _q_num(x.get("registrations")) or 0.0
-        for x in execute_sql(_meta_cohort_imm_sql(anchor), db, url_env, key_env):
-            wi = _q_num(x.get("widx"))
-            if wi is not None:
-                m_imm[int(wi)] = _q_num(x.get("imm_rev")) or 0.0
-        g_spend = _google_daily_spend_by_cohort(anchor)
-    except Exception as exc:
-        errors.append(f"google/live: {exc}")
+        errors.append(f"meta spend q: {exc}")
 
     # ── Combine per cohort week, drop the current partial week ────────────
     today_wi = (datetime.date.today() - datetime.date.fromisoformat(anchor)).days // 7
-    all_wi = sorted(w for w in (set(meta_rev) | set(meta_spend) | set(g_rev) | set(g_reg) | set(g_spend))
+    all_wi = sorted(w for w in (set(meta_rev) | set(meta_spend) | set(meta_reg)
+                                | set(google_rev) | set(google_reg) | set(google_spend))
                     if w < today_wi)
     if last_n:
         all_wi = all_wi[-last_n:]
 
     labels, spend_s, rev_s, reg_s, immrate_s = [], [], [], [], []
     for w in all_wi:
-        tot_spend = meta_spend.get(w, 0.0) + g_spend.get(w, 0.0)
-        tot_rev = meta_rev.get(w, 0.0) + g_rev.get(w, {}).get("revenue", 0.0)
-        meta_reg = (meta_spend.get(w, 0.0) / meta_cpa[w]) if meta_cpa.get(w) else 0.0
-        regs = meta_reg + g_reg.get(w, 0.0)
-        imm = m_imm.get(w, 0.0) + g_rev.get(w, {}).get("imm_rev", 0.0)
-        labels.append(wi_label.get(w) or _cohort_label(anchor, w))
+        tot_spend = meta_spend.get(w, 0.0) + google_spend.get(w, 0.0)
+        tot_rev = meta_rev.get(w, {}).get("revenue", 0.0) + google_rev.get(w, {}).get("revenue", 0.0)
+        regs = meta_reg.get(w, 0.0) + google_reg.get(w, 0.0)
+        imm = meta_rev.get(w, {}).get("imm_rev", 0.0) + google_rev.get(w, {}).get("imm_rev", 0.0)
+        labels.append(_cohort_label(anchor, w))
         spend_s.append(round(tot_spend, 2))
         rev_s.append(round(tot_rev, 2))
         reg_s.append(round(regs))
