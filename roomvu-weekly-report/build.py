@@ -871,6 +871,62 @@ def _week_label(wk):
     return f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b')}"
 
 
+# ── Google Spending & CPA on the Wed–Tue grid (matches Q8473 + Data Feed sheet)
+_GOOGLE_WED_ANCHOR = datetime.date(2026, 1, 7)   # a Wednesday; same anchor as Q8473
+
+# Question 8473 "google register" (db 6, roomview-website), verbatim definition.
+_GOOGLE_8473_REG_SQL = """
+SELECT
+  DATE(DATE_SUB(users.created_at, INTERVAL MOD(DATEDIFF(users.created_at, '2026-01-07'), 7) DAY)) AS week_start,
+  COUNT(DISTINCT users.id) AS registrations
+FROM users
+WHERE users.user_type_id != 1
+  AND users.deleted_at IS NULL
+  AND users.utm_source = 'google'
+  AND users.created_at >= '2025-01-01'
+GROUP BY 1
+ORDER BY 1
+""".strip()
+
+
+def _google_weekly_spend_wed():
+    """All-campaign Google Ads spend from Supermetrics, bucketed into Wed–Tue
+    weeks keyed by the week's Wednesday (a datetime.date)."""
+    out = {}
+    for r in sm.fetch_google_ads(["Date", "Cost"], date_range_type="last_year_inc"):
+        raw = str(r.get("Date", ""))[:10]
+        try:
+            d = datetime.date.fromisoformat(raw)
+        except ValueError:
+            continue
+        ws = d - datetime.timedelta(days=(d - _GOOGLE_WED_ANCHOR).days % 7)
+        out[ws] = out.get(ws, 0.0) + float(r.get("Cost", 0) or 0)
+    return out
+
+
+def _google_8473_regs(url_env, key_env):
+    """{ 'YYYY-MM-DD' (Wed week_start): registrations } from Q8473's def, db 6."""
+    out = {}
+    for r in execute_sql(_GOOGLE_8473_REG_SQL, 6, url_env, key_env):
+        out[str(r.get("week_start", ""))[:10]] = _q_num(r.get("registrations")) or 0
+    return out
+
+
+def _wed_week_window(spend_map, last_n=None):
+    """Sorted Wed week-start dates with spend, excluding the current partial week."""
+    today = datetime.date.today()
+    current = today - datetime.timedelta(days=(today - _GOOGLE_WED_ANCHOR).days % 7)
+    weeks = sorted(w for w, sp in spend_map.items() if sp > 0 and w < current)
+    if last_n:
+        weeks = weeks[-int(last_n):]
+    return weeks
+
+
+def _wed_label(ws):
+    end = ws + datetime.timedelta(days=6)
+    return f"{ws.strftime('%d %b')} - {end.strftime('%d %b')}"
+
+
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     """Fetch one chart's data. Returns (labels, values)."""
     source = chart_cfg["source"]
@@ -930,30 +986,24 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         return labels, values
 
     elif source == "google_ads_spend":
-        # Weekly Google Ads spend from Supermetrics (line chart, currency).
-        spend_map = _google_spend_map(
-            basis=chart_cfg.get("spend_basis", "total"),
-            acq_ids=chart_cfg.get("acquisition_campaign_ids"),
-        )
-        weeks = _complete_week_window(spend_map, chart_cfg.get("last_weeks"))
-        return [_week_label(wk) for wk in weeks], [round(spend_map[wk], 2) for wk in weeks]
+        # Total weekly Google Ads spend (all campaigns) from Supermetrics,
+        # bucketed into Wed–Tue weeks. Matches the Data Feed sheet's col C.
+        spend_map = _google_weekly_spend_wed()
+        weeks = _wed_week_window(spend_map, chart_cfg.get("last_weeks"))
+        return [_wed_label(w) for w in weeks], [round(spend_map[w], 2) for w in weeks]
 
     elif source == "google_ads_cpa":
-        # CPA = weekly spend (Supermetrics) / registrations that week (Metabase).
-        spend_map = _google_spend_map(
-            basis=chart_cfg.get("spend_basis", "total"),
-            acq_ids=chart_cfg.get("acquisition_campaign_ids"),
-        )
-        reg_rows = execute_sql(_GOOGLE_REGISTRATIONS_SQL, chart_cfg["database_id"],
-                               url_env, key_env)
-        reg_map = {_norm_yw(r.get("week_idx", "")): float(r.get("registrations", 0) or 0)
-                   for r in reg_rows}
-        weeks = _complete_week_window(spend_map, chart_cfg.get("last_weeks"))
+        # CPA = total weekly spend / Google registrations that week.
+        # Registrations use Metabase question 8473 "google register" (db 6:
+        # utm_source='google', user_type_id!=1, not deleted, Wed-anchored weeks).
+        spend_map = _google_weekly_spend_wed()
+        reg_map = _google_8473_regs(url_env, key_env)   # keyed by 'YYYY-MM-DD' (Wed)
+        weeks = _wed_week_window(spend_map, chart_cfg.get("last_weeks"))
         labels, values = [], []
-        for wk in weeks:
-            regs = reg_map.get(wk, 0)
-            labels.append(_week_label(wk))
-            values.append(round(spend_map[wk] / regs, 2) if regs > 0 else 0)
+        for w in weeks:
+            regs = reg_map.get(w.isoformat(), 0)
+            labels.append(_wed_label(w))
+            values.append(round(spend_map[w] / regs, 2) if regs else 0)
         return labels, values
 
     elif source == "metabase":
