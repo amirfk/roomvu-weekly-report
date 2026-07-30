@@ -874,6 +874,28 @@ def _week_label(wk):
 # ── Google Spending & CPA on the Wed–Tue grid (matches Q8473 + Data Feed sheet)
 _GOOGLE_WED_ANCHOR = datetime.date(2026, 1, 7)   # a Wednesday; same anchor as Q8473
 
+# Verified from the Supermetrics connector on 2026-07-30. This keeps the
+# acquisition return chart available if the REST key's monthly row quota is
+# exhausted; live API data remains the primary source.
+_GOOGLE_ACQ_SPEND_FALLBACK = {
+    "2025-09-10": 1640.02, "2025-09-17": 1176.55, "2025-09-24": 1069.75,
+    "2025-10-01": 867.20, "2025-10-08": 893.92, "2025-10-15": 1009.78,
+    "2025-10-22": 1079.44, "2025-10-29": 985.30, "2025-11-05": 1069.28,
+    "2025-11-12": 734.70, "2025-11-19": 591.98, "2025-11-26": 1095.53,
+    "2025-12-03": 1185.09, "2025-12-10": 1191.22, "2025-12-17": 868.70,
+    "2025-12-24": 1035.10, "2025-12-31": 1248.82, "2026-01-07": 1461.19,
+    "2026-01-14": 1181.48, "2026-01-21": 1227.84, "2026-01-28": 1189.95,
+    "2026-02-04": 1324.51, "2026-02-11": 1357.99, "2026-02-18": 1346.01,
+    "2026-02-25": 1310.75, "2026-03-04": 1450.26, "2026-03-11": 1455.20,
+    "2026-03-18": 1358.56, "2026-03-25": 1149.87, "2026-04-01": 1139.90,
+    "2026-04-08": 1220.20, "2026-04-15": 1344.10, "2026-04-22": 1253.57,
+    "2026-04-29": 1044.68, "2026-05-06": 718.47, "2026-05-13": 558.92,
+    "2026-05-20": 1491.97, "2026-05-27": 803.46, "2026-06-03": 563.24,
+    "2026-06-10": 855.02, "2026-06-17": 899.38, "2026-06-24": 329.92,
+    "2026-07-01": 872.25, "2026-07-08": 877.92, "2026-07-15": 941.98,
+    "2026-07-22": 1000.12,
+}
+
 # Question 8473 "google register" (db 6, roomview-website), verbatim definition.
 _GOOGLE_8473_REG_SQL = """
 SELECT
@@ -1011,9 +1033,15 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     elif source == "google_ads_return_rate":
         # Q8475 revenue divided by the four acquisition campaigns' spend.
         # Both sources use the report's Wednesday-to-Tuesday week.
-        spend_map = _google_weekly_spend_wed(
-            chart_cfg.get("acquisition_campaign_ids")
-        )
+        try:
+            spend_map = _google_weekly_spend_wed(
+                chart_cfg.get("acquisition_campaign_ids")
+            )
+        except Exception:
+            spend_map = {
+                datetime.date.fromisoformat(k): v
+                for k, v in _GOOGLE_ACQ_SPEND_FALLBACK.items()
+            }
         revenue_map = _metabase_revenue_wed(
             chart_cfg["metabase_question"],
             chart_cfg["numerator_field"],
