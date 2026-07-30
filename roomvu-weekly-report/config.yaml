@@ -175,9 +175,8 @@ slides:
     platform_icon: google
     charts:
       - label: "Total Return Rate"
-        source: google_ads_ratio
-        database_id: 74
-        numerator_sql: google_total_revenue
+        source: google_ads_return_rate
+        metabase_question: 8475
         numerator_field: total_revenue
         x_field: week
         format: percent
@@ -189,9 +188,6 @@ slides:
           - "17809534029"   # RV - Registration - PPC Video
           - "17948075953"   # RV - Registration - Competitors
           - "22265795515"   # RV - Registration - Competitors [IDX]
-          - "22440586485"   # RV - Registration - Competitors [Real Geeks]
-          - "23737726709"   # RV - Registration - Competitors [Insurance Agent]
-          - "23735196152"   # RV - Registration - Competitors [Financial Advisor]
       - label: "Immediate Revenue Rate"
         source: google_ads_ratio
         database_id: 74

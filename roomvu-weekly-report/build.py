@@ -889,11 +889,17 @@ ORDER BY 1
 """.strip()
 
 
-def _google_weekly_spend_wed():
+def _google_weekly_spend_wed(campaign_ids=None):
     """All-campaign Google Ads spend from Supermetrics, bucketed into Wed–Tue
     weeks keyed by the week's Wednesday (a datetime.date)."""
+    campaign_ids = {str(c) for c in (campaign_ids or [])}
     out = {}
-    for r in sm.fetch_google_ads(["Date", "Cost"], date_range_type="last_year_inc"):
+    fields = ["Date", "Cost"]
+    if campaign_ids:
+        fields.insert(1, "Campaignid")
+    for r in sm.fetch_google_ads(fields, date_range_type="last_year_inc"):
+        if campaign_ids and str(r.get("Campaignid", "")) not in campaign_ids:
+            continue
         raw = str(r.get("Date", ""))[:10]
         try:
             d = datetime.date.fromisoformat(raw)
@@ -901,6 +907,23 @@ def _google_weekly_spend_wed():
             continue
         ws = d - datetime.timedelta(days=(d - _GOOGLE_WED_ANCHOR).days % 7)
         out[ws] = out.get(ws, 0.0) + float(r.get("Cost", 0) or 0)
+    return out
+
+
+def _metabase_revenue_wed(question_id, value_field, url_env, key_env):
+    """Return Metabase revenue keyed by its Wednesday week_start."""
+    out = {}
+    for row in fetch_question(question_id, url_env, key_env):
+        fields = {str(k).lower().replace(" ", "_"): v for k, v in row.items()}
+        raw_week = fields.get("week_start") or fields.get("week")
+        raw_value = fields.get(value_field.lower())
+        if not raw_week:
+            continue
+        try:
+            week_start = datetime.date.fromisoformat(str(raw_week)[:10])
+        except ValueError:
+            continue
+        out[week_start] = _q_num(raw_value) or 0.0
     return out
 
 
@@ -984,6 +1007,27 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         labels = [_week_label(wk) for wk in weeks]
         values = [round(rev_map.get(wk, 0.0) / spend_map[wk] * 100, 2) for wk in weeks]
         return labels, values
+
+    elif source == "google_ads_return_rate":
+        # Q8475 revenue divided by the four acquisition campaigns' spend.
+        # Both sources use the report's Wednesday-to-Tuesday week.
+        spend_map = _google_weekly_spend_wed(
+            chart_cfg.get("acquisition_campaign_ids")
+        )
+        revenue_map = _metabase_revenue_wed(
+            chart_cfg["metabase_question"],
+            chart_cfg["numerator_field"],
+            url_env,
+            key_env,
+        )
+        weeks = _wed_week_window(spend_map, chart_cfg.get("last_weeks"))
+        return (
+            [_wed_label(w) for w in weeks],
+            [
+                round(revenue_map.get(w, 0.0) / spend_map[w] * 100, 2)
+                for w in weeks
+            ],
+        )
 
     elif source == "google_ads_spend":
         # Total weekly Google Ads spend (all campaigns) from Supermetrics,
