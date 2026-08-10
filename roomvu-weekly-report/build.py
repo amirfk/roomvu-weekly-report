@@ -98,6 +98,55 @@ def build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols):
     }
 
 
+_COHORT_MATURITY_COLS = [("W1_rev", "W1"), ("W2_rev", "W2"), ("W3_rev", "W3"),
+                         ("W4_rev", "W4"), ("W5_rev", "W5")]
+
+
+def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
+    """ROI cohort table computed from two questions: a REVENUE question
+    (week_idx, week, registrations, W1_rev..W5_rev = cumulative revenue at each
+    maturity) and a SPEND question (week_idx, Amount_Spent). Each cell is the
+    return rate Wn_rev / Amount_Spent * 100, joined on week_idx."""
+    title = slide_cfg["title"]
+    try:
+        rev_rows = fetch_question(slide_cfg["revenue_q"], url_env, key_env)
+        spend_rows = fetch_question(slide_cfg["spend_q"], url_env, key_env)
+    except Exception as exc:
+        print(f"  [ERR]  '{title}' — {exc}", file=sys.stderr)
+        return {"title": title, "render": "cohort_table", "skipped": True, "error": str(exc)}
+
+    spend_by_wi = {}
+    for r in spend_rows:
+        wi = _q_num(r.get("week_idx"))
+        if wi is not None:
+            spend_by_wi[int(wi)] = _q_num(r.get("Amount_Spent")) or 0.0
+
+    mat = [(rc, lbl) for rc, lbl in _COHORT_MATURITY_COLS if rev_rows and rc in rev_rows[0]]
+    week_cols = [lbl for _, lbl in mat]
+    parsed = []
+    for r in rev_rows:
+        wi = _q_num(r.get("week_idx"))
+        spend = spend_by_wi.get(int(wi), 0.0) if wi is not None else 0.0
+        cells = {}
+        for rc, lbl in mat:
+            rev = _q_num(r.get(rc))
+            if rev is None or not spend:
+                cells[lbl] = {"text": "", "color": None}
+            else:
+                pct = rev / spend * 100
+                cells[lbl] = {"text": f"{pct:.0f}%", "color": _roi_color(pct)}
+        parsed.append({
+            "week_idx": r.get("week_idx", ""),
+            "week": r.get("week", ""),
+            "Registration": _fmt_number(r.get("registrations")),
+            "Amount_Spent_display": (f"{int(round(spend)):,}" if spend else ""),
+            "week_cells": cells,
+        })
+    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (revenue/spend ratio), cols: {week_cols}")
+    return {"title": title, "render": "cohort_table", "skipped": False,
+            "week_cols": week_cols, "rows": parsed}
+
+
 # ── Meta KPI slides ──────────────────────────────────────────────────────────
 
 def _first_row(rows: list) -> dict:
@@ -1176,6 +1225,8 @@ def build():
         try:
             if render == "cohort_table":
                 slides_data.append(build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols))
+            elif render == "cohort_ratio":
+                slides_data.append(build_cohort_ratio_slide(slide_cfg, url_env, key_env))
             elif render == "meta_kpi":
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render == "branded_search":

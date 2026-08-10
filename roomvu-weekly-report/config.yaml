@@ -12,10 +12,11 @@ deck:
 
 slides:
   - id: insurance_roi
-    metabase_question: 8268
     title: "Meta · Insurance Agents — ROI Cohort (Weekly)"
-    render: cohort_table
+    render: cohort_ratio       # cells = revenue (8515) / spend (8516) per cohort week
     platform: meta
+    revenue_q: 8515            # Meta – Insurance ROI Cohort — REVENUE (db 6)
+    spend_q: 8516              # Meta – Insurance ROI Cohort — SPEND (db 74)
   - id: financial_planners_roi
     metabase_question: 8271
     title: "Meta · Financial Planners — ROI Cohort (Weekly)"
