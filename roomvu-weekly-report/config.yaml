@@ -17,6 +17,7 @@ slides:
     platform: meta
     revenue_q: 8515            # Meta – Insurance ROI Cohort — REVENUE (db 6)
     spend_q: 8516              # Meta – Insurance ROI Cohort — SPEND (db 74)
+    cohort_anchor: "2026-05-06"  # anchor in 8515/8516; blanks immature Wn windows
   - id: financial_planners_roi
     metabase_question: 8271
     title: "Meta · Financial Planners — ROI Cohort (Weekly)"

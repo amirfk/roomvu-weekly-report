@@ -123,14 +123,28 @@ def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
 
     mat = [(rc, lbl) for rc, lbl in _COHORT_MATURITY_COLS if rev_rows and rc in rev_rows[0]]
     week_cols = [lbl for _, lbl in mat]
+
+    # Blank out maturity windows that haven't fully elapsed yet. Wn covers
+    # [cohort_start, cohort_start + (7n+1) days); it is complete only once today
+    # has reached that upper bound, otherwise the query just repeats a partial
+    # cumulative number.
+    anchor = slide_cfg.get("cohort_anchor")
+    anchor_date = datetime.date.fromisoformat(anchor) if anchor else None
+    today = datetime.date.today()
+
     parsed = []
     for r in rev_rows:
         wi = _q_num(r.get("week_idx"))
         spend = spend_by_wi.get(int(wi), 0.0) if wi is not None else 0.0
+        cohort_start = (anchor_date + datetime.timedelta(days=int(wi) * 7)
+                        if (anchor_date is not None and wi is not None) else None)
         cells = {}
         for rc, lbl in mat:
+            n = int(lbl[1:])   # "W3" -> 3
+            mature = (cohort_start is None
+                      or today >= cohort_start + datetime.timedelta(days=7 * n + 1))
             rev = _q_num(r.get(rc))
-            if rev is None or not spend:
+            if not mature or rev is None or not spend:
                 cells[lbl] = {"text": "", "color": None}
             else:
                 pct = rev / spend * 100
