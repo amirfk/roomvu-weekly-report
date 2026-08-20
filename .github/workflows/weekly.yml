@@ -2,8 +2,10 @@ name: Weekly ROI Cohort Report
 
 on:
   schedule:
-    # Wednesday 06:00 UTC — matches Wed–Tue cohort week
-    - cron: '0 6 * * 3'
+    # Thursday 06:00 UTC. The Wed–Tue cohort week's W1 window is
+    # [cohort_start, cohort_start+8d); it only fully closes on the Thursday
+    # after the week ends, so the just-completed week's row appears then.
+    - cron: '0 6 * * 4'
   workflow_dispatch:
 
 permissions:
