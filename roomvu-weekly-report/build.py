@@ -176,16 +176,27 @@ def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor):
 _UTM_CAMPAIGN_ID = "substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1)"
 
 
-def _combined_cohort_rev_sql(anchor, meta_ids, google_exclude_ids):
-    meta_in = ",".join(f"'{c}'" for c in meta_ids)
-    g_excl = ",".join(f"'{c}'" for c in google_exclude_ids) or "''"
-    # Google utm_campaign may lack the "<id>-..." shape; coalesce -> '' keeps
-    # those users in the segment (only explicitly tagged excluded campaigns drop).
+def _ids_sql(ids):
+    return ",".join(f"'{c}'" for c in ids) or "''"
+
+
+def _meta_user_where(meta_ids=None, meta_exclude_ids=None):
+    """Meta users in the segment: either an explicit campaign list, or every
+    facebook campaign except the excluded ones (the 'all Real Estate' rule)."""
+    if meta_exclude_ids:
+        return (f"(u.utm_source='facebook' "
+                f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(meta_exclude_ids)}))")
+    return f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({_ids_sql(meta_ids or [])}))"
+
+
+def _combined_cohort_rev_sql(anchor, google_exclude_ids, meta_ids=None, meta_exclude_ids=None):
+    # utm_campaign may lack the "<id>-..." shape; coalesce -> '' keeps those
+    # users in the segment (only explicitly tagged excluded campaigns drop).
     segment = (
         f"u.user_type_id != 1 and ("
-        f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({meta_in})) "
+        f"{_meta_user_where(meta_ids, meta_exclude_ids)} "
         f"or (u.utm_source in ('google','google-ads') "
-        f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({g_excl}))"
+        f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(google_exclude_ids)}))"
         f") and u.created_at >= (select start_date from anchor)"
     )
     return f"""
@@ -230,9 +241,14 @@ select * from (
 """.strip()
 
 
-def _meta_cohort_spend_sql(anchor, meta_ids):
-    """Meta spend per cohort week — verbatim shape of questions 8516/8518."""
-    meta_in = ",".join(f"'{c}'" for c in meta_ids)
+def _meta_cohort_spend_sql(anchor, meta_ids=None, meta_exclude_ids=None):
+    """Meta spend per cohort week — verbatim shape of questions 8516/8518,
+    with either an explicit campaign list or 'all facebook campaigns except'."""
+    if meta_exclude_ids:
+        camp_where = (f"c.account_name like 'facebook%' "
+                      f"and c.campaign_id not in ({_ids_sql(meta_exclude_ids)})")
+    else:
+        camp_where = f"c.campaign_id in ({_ids_sql(meta_ids or [])})"
     return f"""
 with anchor as (select date '{anchor}' as start_date)
 select floor(datediff(aa.date,(select start_date from anchor))/7) as week_idx,
@@ -240,7 +256,7 @@ select floor(datediff(aa.date,(select start_date from anchor))/7) as week_idx,
 from ad_analytics aa
 left join ads a on aa.ad_id = a.id
 left join campaigns c on a.campaign_id = c.id
-where c.campaign_id in ({meta_in}) and aa.date >= (select start_date from anchor)
+where {camp_where} and aa.date >= (select start_date from anchor)
 group by 1
 """.strip()
 
@@ -281,13 +297,14 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
     title = slide_cfg["title"]
     anchor = slide_cfg["cohort_anchor"]
     meta_ids = [str(c) for c in slide_cfg.get("meta_campaigns", [])]
+    meta_excl = [str(c) for c in slide_cfg.get("meta_exclude_campaigns", [])]
     g_excl = [str(c) for c in slide_cfg.get("google_exclude_campaigns", [])]
     g_incl = [str(c) for c in slide_cfg.get("google_campaigns", [])]
     rev_db = int(slide_cfg.get("revenue_database_id", 6))
     spend_db = int(slide_cfg.get("spend_database_id", 74))
 
-    rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, meta_ids, g_excl), rev_db, url_env, key_env)
-    meta_spend_rows = execute_sql(_meta_cohort_spend_sql(anchor, meta_ids), spend_db, url_env, key_env)
+    rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, g_excl, meta_ids, meta_excl), rev_db, url_env, key_env)
+    meta_spend_rows = execute_sql(_meta_cohort_spend_sql(anchor, meta_ids, meta_excl), spend_db, url_env, key_env)
     google_spend = _google_spend_by_cohort(anchor, exclude_ids=g_excl, include_ids=g_incl)
 
     meta_spend = {}
@@ -308,54 +325,9 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
               f"spend meta ${meta_spend.get(wi, 0):,.0f} + google ${google_spend.get(wi, 0):,.0f} | "
               f"W1 ${_q_num(r.get('W1_rev')) or 0:,.0f}")
     print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (Meta+Google revenue/spend), cols: {week_cols}")
-    _diag_re_mb(anchor, url_env, key_env, rev_db, spend_db)   # TEMP diagnostic
     return {"title": title, "render": "cohort_table", "skipped": False,
             "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note")}
 
-
-def _diag_re_mb(anchor, url_env, key_env, rev_db, spend_db):
-    """TEMP: reverse-engineer the manual RE+MB cohort. Prints Meta spend by
-    campaign per cohort week, and registrations/W1/W2 revenue by utm campaign."""
-    try:
-        spend_sql = f"""
-select floor(datediff(aa.date,'{anchor}')/7) as wi, c.campaign_id, c.name, c.account_name,
-       round(sum(aa.spend),0) as raw_spend,
-       round(sum(if(c.account_name='facebook', aa.spend, aa.spend*1.39)),0) as spend_conv
-from ad_analytics aa
-left join ads a on aa.ad_id = a.id
-left join campaigns c on a.campaign_id = c.id
-where aa.date >= '2026-07-29' and aa.date < '2026-09-02'
-group by 1,2,3,4 having raw_spend > 0 order by 1, spend_conv desc"""
-        print("  [DIAG] Meta spend by campaign per cohort week:")
-        for r in execute_sql(spend_sql, spend_db, url_env, key_env):
-            print(f"         wi={r['wi']} {r['campaign_id']} | {str(r['name'])[:55]:<55} | {r['account_name']} | raw {r['raw_spend']} | conv {r['spend_conv']}")
-        rev_sql = f"""
-with anchor as (select date '{anchor}' as start_date),
-cu as (
-  select u.id as user_id, u.utm_source as src, u.utm_medium as med,
-    coalesce({_UTM_CAMPAIGN_ID}, u.utm_campaign) as camp,
-    floor(datediff(u.created_at,(select start_date from anchor))/7) as wi,
-    (select start_date from anchor) + interval (floor(datediff(u.created_at,(select start_date from anchor))/7)*7) day as cs
-  from users u
-  where u.user_type_id != 1 and u.created_at >= '2026-07-29' and u.created_at < '2026-09-02'
-    and (u.utm_source in ('facebook','google','google-ads') or u.utm_source like '%face%' or u.utm_source like '%goog%' or u.utm_source like '%meta%' or u.utm_source like '%insta%')
-),
-rev as (
-  select cu.user_id,
-    sum(if(f.created_at < cu.cs + interval 8 day,  if(f.currency='CAD',f.amount,f.amount*1.3),0)) as w1,
-    sum(if(f.created_at < cu.cs + interval 15 day, if(f.currency='CAD',f.amount,f.amount*1.3),0)) as w2
-  from cu join financials f on f.user_id=cu.user_id
-  where f.gateway_transaction_type in ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded') and f.amount>=1.0
-  group by 1
-)
-select cu.wi, cu.src, cu.med, cu.camp, count(*) as regs, round(coalesce(sum(r.w1),0)) as w1, round(coalesce(sum(r.w2),0)) as w2
-from cu left join rev r on r.user_id=cu.user_id
-group by 1,2,3,4 having regs >= 2 or w2 > 0 order by 1, regs desc"""
-        print("  [DIAG] registrations / W1 / W2 revenue by utm campaign per cohort week:")
-        for r in execute_sql(rev_sql, rev_db, url_env, key_env):
-            print(f"         wi={r['wi']} {r['src']}/{r['med']} {str(r['camp'])[:40]:<40} regs {r['regs']:>4} | W1 {r['w1']:>7} | W2 {r['w2']:>7}")
-    except Exception as exc:
-        print(f"  [DIAG] failed: {exc}", file=sys.stderr)
 
 
 # ── Meta KPI slides ──────────────────────────────────────────────────────────

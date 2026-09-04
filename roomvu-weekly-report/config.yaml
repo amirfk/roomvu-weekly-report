@@ -38,25 +38,32 @@ slides:
 
   # Real Estate & Mortgage Broker across BOTH platforms, on the same weekly
   # cohort grid / W1..W5 maturity windows as 8515–8518. Computed live because
-  # Google spend lives in Supermetrics, not Metabase:
-  #   revenue = cohort users from the Meta Realtor+Mortgage campaigns OR Google
-  #             (all Google campaigns except the Insurance/Financial verticals)
-  #   spend   = Meta ad_analytics (8516 shape) + Google Supermetrics daily cost
+  # Google spend lives in Supermetrics, not Metabase.
+  # Segment rule (reverse-engineered from the manual Sep-2 deck, spend matches
+  # within $8/week): "Real Estate + MB" = EVERY campaign on either platform
+  # except the Insurance / Financial verticals. On Meta that is Realtor, MB,
+  # RV-Registration [Create]/[Biocoach], RV-Retargeting USD/[Bootcamp],
+  # RV-Integrations… and any new RE campaign is picked up automatically.
+  #   revenue/regs = cohort users tagged with any non-excluded campaign
+  #   spend        = Meta ad_analytics (8516 shape) + Google Supermetrics daily
   - id: re_mb_roi_meta_google
     title: "Meta & Google · Real Estate & Mortgage Brokers — ROI Cohort (Weekly)"
     render: cohort_combined
     cohort_anchor: "2026-05-06"
     revenue_database_id: 6      # roomview-website (users/financials)
     spend_database_id: 74       # roomvu_ads_metrics (ad_analytics)
-    meta_campaigns:
-      - "120231753483890603"    # Realtor
-      - "120233281815980603"    # Mortgage Broker
+    meta_exclude_campaigns:     # Meta = everything except these verticals
+      - "120233992944810603"    # Insurance Registration - USD
+      - "120218175521230626"    # Insurance Registration - Advantage+
+      - "120227402303430626"    # Insurance Registration
+      - "120250806358890603"    # Finance Registration - LAL - USD
+      - "120236934764070603"    # Finance Registration - Advantage - USD
     google_exclude_campaigns:   # Google = everything except these verticals
       - "22605096945"           # RV - Registration - Insurance Agents
       - "22448879276"           # RV - Registration - Financial Advisors
       - "23737726709"           # RV - Registration - Competitors [Insurance Agent]
       - "23735196152"           # RV - Registration - Competitors [Financial Advisor]
-    note: "Meta: Realtor + Mortgage Broker campaigns · Google: all campaigns except Insurance Agents / Financial Advisors. Cells = combined cumulative revenue ÷ combined spend (Meta ad_analytics + Google Supermetrics)."
+    note: "Real Estate + MB = all Meta and Google campaigns except the Insurance / Financial verticals (incl. Meta Create, Biocoach, Retargeting, Integrations). Cells = combined cumulative revenue ÷ combined spend (Meta ad_analytics + Google Supermetrics)."
 
   # ── Meta KPI slides (Metabase) ────────────────────────────────
   - id: meta_insurance_kpi
