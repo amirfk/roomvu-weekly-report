@@ -33,6 +33,9 @@ def fetch(ds_id, account_id, fields, date_range_type="this_year",
         params["end_date"] = end_date
     if settings:
         params.update(settings)
+    # The API silently truncates at 1000 rows by default. Daily x campaign
+    # pulls exceed that within a few months and would drop the newest days.
+    params.setdefault("max_rows", 50000)
 
     # Build query string — arrays use repeated keys
     from urllib.parse import urlencode

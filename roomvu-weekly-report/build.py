@@ -254,6 +254,8 @@ def _google_spend_by_cohort(anchor_str, exclude_ids=None, include_ids=None):
     fields = ["Date", "Campaignid", "Cost"] if (exclude or include) else ["Date", "Cost"]
     today = datetime.date.today()
     rows = sm.fetch_google_ads(fields, start_date=a.isoformat(), end_date=today.isoformat())
+    last = max((str(r.get("Date", ""))[:10] for r in rows), default="n/a")
+    print(f"         google spend: {len(rows)} daily rows from {a} (latest date {last})")
     out = {}
     for r in rows:
         cid = str(r.get("Campaignid", ""))
