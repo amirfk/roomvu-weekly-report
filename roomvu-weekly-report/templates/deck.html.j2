@@ -468,6 +468,7 @@
               {% endfor %}
             </tbody>
           </table>
+          {% if slide.note %}<p class="fin-note">{{ slide.note }}</p>{% endif %}
         </div>
 
         {% elif slide.render == 'meta_kpi' %}

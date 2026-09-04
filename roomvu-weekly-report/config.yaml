@@ -36,6 +36,28 @@ slides:
     render: cohort_table
     platform: meta
 
+  # Real Estate & Mortgage Broker across BOTH platforms, on the same weekly
+  # cohort grid / W1..W5 maturity windows as 8515–8518. Computed live because
+  # Google spend lives in Supermetrics, not Metabase:
+  #   revenue = cohort users from the Meta Realtor+Mortgage campaigns OR Google
+  #             (all Google campaigns except the Insurance/Financial verticals)
+  #   spend   = Meta ad_analytics (8516 shape) + Google Supermetrics daily cost
+  - id: re_mb_roi_meta_google
+    title: "Meta & Google · Real Estate & Mortgage Brokers — ROI Cohort (Weekly)"
+    render: cohort_combined
+    cohort_anchor: "2026-05-06"
+    revenue_database_id: 6      # roomview-website (users/financials)
+    spend_database_id: 74       # roomvu_ads_metrics (ad_analytics)
+    meta_campaigns:
+      - "120231753483890603"    # Realtor
+      - "120233281815980603"    # Mortgage Broker
+    google_exclude_campaigns:   # Google = everything except these verticals
+      - "22605096945"           # RV - Registration - Insurance Agents
+      - "22448879276"           # RV - Registration - Financial Advisors
+      - "23737726709"           # RV - Registration - Competitors [Insurance Agent]
+      - "23735196152"           # RV - Registration - Competitors [Financial Advisor]
+    note: "Meta: Realtor + Mortgage Broker campaigns · Google: all campaigns except Insurance Agents / Financial Advisors. Cells = combined cumulative revenue ÷ combined spend (Meta ad_analytics + Google Supermetrics)."
+
   # ── Meta KPI slides (Metabase) ────────────────────────────────
   - id: meta_insurance_kpi
     title: "Meta - Insurance Agents Registration"

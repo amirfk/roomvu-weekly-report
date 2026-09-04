@@ -121,6 +121,15 @@ def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
         if wi is not None:
             spend_by_wi[int(wi)] = _q_num(r.get("Amount_Spent")) or 0.0
 
+    week_cols, parsed = _cohort_ratio_rows(rev_rows, spend_by_wi, slide_cfg.get("cohort_anchor"))
+    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (revenue/spend ratio), cols: {week_cols}")
+    return {"title": title, "render": "cohort_table", "skipped": False,
+            "week_cols": week_cols, "rows": parsed}
+
+
+def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor):
+    """Turn revenue rows (week_idx, week, registrations, W1_rev..W5_rev) plus a
+    {week_idx: spend} map into cohort_table rows of Wn_rev / spend percentages."""
     mat = [(rc, lbl) for rc, lbl in _COHORT_MATURITY_COLS if rev_rows and rc in rev_rows[0]]
     week_cols = [lbl for _, lbl in mat]
 
@@ -128,7 +137,6 @@ def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
     # [cohort_start, cohort_start + (7n+1) days); it is complete only once today
     # has reached that upper bound, otherwise the query just repeats a partial
     # cumulative number.
-    anchor = slide_cfg.get("cohort_anchor")
     anchor_date = datetime.date.fromisoformat(anchor) if anchor else None
     today = datetime.date.today()
 
@@ -156,9 +164,150 @@ def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
             "Amount_Spent_display": (f"{int(round(spend)):,}" if spend else ""),
             "week_cells": cells,
         })
-    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (revenue/spend ratio), cols: {week_cols}")
+    return week_cols, parsed
+
+
+# ── Combined-channel ROI cohort (Meta + Google, computed live) ───────────────
+# Same cohort grid and W1..W5 maturity windows as questions 8515–8518, but the
+# segment spans two ad platforms, so the pieces are computed here and summed:
+#   revenue  = cohort users from the Meta campaigns OR Google (db 6, 8515 shape)
+#   spend    = Meta ad_analytics (db 74, 8516 shape) + Google Supermetrics daily
+
+_UTM_CAMPAIGN_ID = "substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1)"
+
+
+def _combined_cohort_rev_sql(anchor, meta_ids, google_exclude_ids):
+    meta_in = ",".join(f"'{c}'" for c in meta_ids)
+    g_excl = ",".join(f"'{c}'" for c in google_exclude_ids) or "''"
+    # Google utm_campaign may lack the "<id>-..." shape; coalesce -> '' keeps
+    # those users in the segment (only explicitly tagged excluded campaigns drop).
+    segment = (
+        f"u.user_type_id != 1 and ("
+        f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({meta_in})) "
+        f"or (u.utm_source in ('google','google-ads') "
+        f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({g_excl}))"
+        f") and u.created_at >= (select start_date from anchor)"
+    )
+    return f"""
+with anchor as (select date '{anchor}' as start_date),
+cohort_users as (
+  select u.id as user_id,
+    floor(datediff(u.created_at,(select start_date from anchor))/7) as week_idx,
+    (select start_date from anchor) + interval (floor(datediff(u.created_at,(select start_date from anchor))/7)*7) day as cohort_start,
+    if(u.utm_source='facebook','meta','google') as src
+  from users u
+  where {segment}
+),
+reg_cohort as (
+  select week_idx, count(distinct user_id) as registrations,
+         sum(src='meta') as meta_reg, sum(src='google') as google_reg
+  from cohort_users group by 1
+),
+rev as (
+  select cu.week_idx,
+    sum(if(f.created_at < cu.cohort_start + interval 8 day,  if(f.currency='CAD',f.amount,f.amount*1.3),0)) as W1_rev,
+    sum(if(f.created_at < cu.cohort_start + interval 15 day, if(f.currency='CAD',f.amount,f.amount*1.3),0)) as W2_rev,
+    sum(if(f.created_at < cu.cohort_start + interval 22 day, if(f.currency='CAD',f.amount,f.amount*1.3),0)) as W3_rev,
+    sum(if(f.created_at < cu.cohort_start + interval 29 day, if(f.currency='CAD',f.amount,f.amount*1.3),0)) as W4_rev,
+    sum(if(f.created_at < cu.cohort_start + interval 36 day, if(f.currency='CAD',f.amount,f.amount*1.3),0)) as W5_rev
+  from cohort_users cu join financials f on f.user_id=cu.user_id
+  where f.gateway_transaction_type in ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+    and f.amount>=1.0
+  group by 1
+)
+select * from (
+  select rc.week_idx,
+    concat(date_format((select start_date from anchor)+interval (rc.week_idx*7) day,'%e %b'),' - ',
+           date_format((select start_date from anchor)+interval (rc.week_idx*7+6) day,'%e %b')) as week,
+    rc.registrations, rc.meta_reg, rc.google_reg,
+    round(coalesce(r.W1_rev,0),2) as W1_rev, round(coalesce(r.W2_rev,0),2) as W2_rev,
+    round(coalesce(r.W3_rev,0),2) as W3_rev, round(coalesce(r.W4_rev,0),2) as W4_rev,
+    round(coalesce(r.W5_rev,0),2) as W5_rev
+  from reg_cohort rc left join rev r on r.week_idx=rc.week_idx
+  where (select start_date from anchor) + interval (rc.week_idx*7 + 8) day <= curdate()
+  order by rc.week_idx desc limit 5
+) t order by t.week_idx asc
+""".strip()
+
+
+def _meta_cohort_spend_sql(anchor, meta_ids):
+    """Meta spend per cohort week — verbatim shape of questions 8516/8518."""
+    meta_in = ",".join(f"'{c}'" for c in meta_ids)
+    return f"""
+with anchor as (select date '{anchor}' as start_date)
+select floor(datediff(aa.date,(select start_date from anchor))/7) as week_idx,
+       sum(if(c.account_name='facebook', aa.spend, aa.spend*1.39)) as Amount_Spent
+from ad_analytics aa
+left join ads a on aa.ad_id = a.id
+left join campaigns c on a.campaign_id = c.id
+where c.campaign_id in ({meta_in}) and aa.date >= (select start_date from anchor)
+group by 1
+""".strip()
+
+
+def _google_spend_by_cohort(anchor_str, exclude_ids=None, include_ids=None):
+    """Google Ads spend from Supermetrics daily rows, bucketed into Wed–Tue cohort
+    weeks (week_idx from anchor). Only fetches from the anchor forward."""
+    a = datetime.date.fromisoformat(anchor_str)
+    exclude = {str(c) for c in (exclude_ids or [])}
+    include = {str(c) for c in (include_ids or [])}
+    fields = ["Date", "Campaignid", "Cost"] if (exclude or include) else ["Date", "Cost"]
+    today = datetime.date.today()
+    rows = sm.fetch_google_ads(fields, start_date=a.isoformat(), end_date=today.isoformat())
+    out = {}
+    for r in rows:
+        cid = str(r.get("Campaignid", ""))
+        if exclude and cid in exclude:
+            continue
+        if include and cid not in include:
+            continue
+        raw = str(r.get("Date", ""))[:10]
+        try:
+            d = datetime.date.fromisoformat(raw)
+        except ValueError:
+            continue
+        widx = (d - a).days // 7
+        if widx < 0:
+            continue
+        out[widx] = out.get(widx, 0.0) + float(r.get("Cost", 0) or 0)
+    return out
+
+
+def build_cohort_combined_slide(slide_cfg, url_env, key_env):
+    """ROI cohort across Meta + Google for one segment: cells = combined
+    cumulative revenue (Wn) / combined spend, per registration cohort week."""
+    title = slide_cfg["title"]
+    anchor = slide_cfg["cohort_anchor"]
+    meta_ids = [str(c) for c in slide_cfg.get("meta_campaigns", [])]
+    g_excl = [str(c) for c in slide_cfg.get("google_exclude_campaigns", [])]
+    g_incl = [str(c) for c in slide_cfg.get("google_campaigns", [])]
+    rev_db = int(slide_cfg.get("revenue_database_id", 6))
+    spend_db = int(slide_cfg.get("spend_database_id", 74))
+
+    rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, meta_ids, g_excl), rev_db, url_env, key_env)
+    meta_spend_rows = execute_sql(_meta_cohort_spend_sql(anchor, meta_ids), spend_db, url_env, key_env)
+    google_spend = _google_spend_by_cohort(anchor, exclude_ids=g_excl, include_ids=g_incl)
+
+    meta_spend = {}
+    for r in meta_spend_rows:
+        wi = _q_num(r.get("week_idx"))
+        if wi is not None:
+            meta_spend[int(wi)] = _q_num(r.get("Amount_Spent")) or 0.0
+
+    spend_by_wi = {}
+    for wi in set(meta_spend) | set(google_spend):
+        spend_by_wi[wi] = meta_spend.get(wi, 0.0) + google_spend.get(wi, 0.0)
+
+    week_cols, parsed = _cohort_ratio_rows(rev_rows, spend_by_wi, anchor)
+    for r in rev_rows:
+        wi = int(_q_num(r.get("week_idx")) or 0)
+        print(f"         {r.get('week')}: reg {r.get('registrations')} "
+              f"(meta {r.get('meta_reg')}, google {r.get('google_reg')}) | "
+              f"spend meta ${meta_spend.get(wi, 0):,.0f} + google ${google_spend.get(wi, 0):,.0f} | "
+              f"W1 ${_q_num(r.get('W1_rev')) or 0:,.0f}")
+    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (Meta+Google revenue/spend), cols: {week_cols}")
     return {"title": title, "render": "cohort_table", "skipped": False,
-            "week_cols": week_cols, "rows": parsed}
+            "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note")}
 
 
 # ── Meta KPI slides ──────────────────────────────────────────────────────────
@@ -1241,6 +1390,8 @@ def build():
                 slides_data.append(build_cohort_slide(slide_cfg, url_env, key_env, fixed_cols))
             elif render == "cohort_ratio":
                 slides_data.append(build_cohort_ratio_slide(slide_cfg, url_env, key_env))
+            elif render == "cohort_combined":
+                slides_data.append(build_cohort_combined_slide(slide_cfg, url_env, key_env))
             elif render == "meta_kpi":
                 slides_data.append(build_meta_kpi_slide(slide_cfg, url_env, key_env))
             elif render == "branded_search":
