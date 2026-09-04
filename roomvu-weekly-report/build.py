@@ -195,7 +195,7 @@ def _meta_user_where(meta_ids=None, meta_exclude_ids=None):
     return f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({_ids_sql(meta_ids or [])}))"
 
 
-def _combined_cohort_rev_sql(anchor, google_exclude_ids, meta_ids=None, meta_exclude_ids=None):
+def _combined_cohort_rev_sql(anchor, google_exclude_ids, meta_ids=None, meta_exclude_ids=None, limit_rows=5):
     # utm_campaign may lack the "<id>-..." shape; coalesce -> '' keeps those
     # users in the segment (only explicitly tagged excluded campaigns drop).
     segment = (
@@ -242,7 +242,7 @@ select * from (
     round(coalesce(r.W5_rev,0),2) as W5_rev
   from reg_cohort rc left join rev r on r.week_idx=rc.week_idx
   where (select start_date from anchor) + interval (rc.week_idx*7 + 8) day <= curdate()
-  order by rc.week_idx desc limit 5
+  order by rc.week_idx desc limit {int(limit_rows)}
 ) t order by t.week_idx asc
 """.strip()
 
@@ -309,7 +309,8 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
     rev_db = int(slide_cfg.get("revenue_database_id", 6))
     spend_db = int(slide_cfg.get("spend_database_id", 74))
 
-    rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, g_excl, meta_ids, meta_excl), rev_db, url_env, key_env)
+    rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, g_excl, meta_ids, meta_excl,
+                                                    limit_rows=slide_cfg.get("rows", 5)), rev_db, url_env, key_env)
     meta_spend_rows = execute_sql(_meta_cohort_spend_sql(anchor, meta_ids, meta_excl), spend_db, url_env, key_env)
     google_spend = _google_spend_by_cohort(anchor, exclude_ids=g_excl, include_ids=g_incl)
 

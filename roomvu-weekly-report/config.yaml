@@ -50,6 +50,7 @@ slides:
     title: "Real estate + MB Cohort ROI - Meta & Google"
     render: cohort_combined
     cohort_anchor: "2026-05-06"
+    rows: 4                     # last 4 closed cohort weeks (manual deck shows 4)
     max_weeks: 4                # manual deck shows W1..W4
     week_label_style: long      # "29 July to 4 August"
     headers: {week: "", registrations: "Registration", spend: "Amount Spent"}
