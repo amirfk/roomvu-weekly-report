@@ -127,10 +127,14 @@ def build_cohort_ratio_slide(slide_cfg, url_env, key_env):
             "week_cols": week_cols, "rows": parsed}
 
 
-def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor):
+def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor, max_weeks=None, label_fn=None):
     """Turn revenue rows (week_idx, week, registrations, W1_rev..W5_rev) plus a
-    {week_idx: spend} map into cohort_table rows of Wn_rev / spend percentages."""
+    {week_idx: spend} map into cohort_table rows of Wn_rev / spend percentages.
+    max_weeks caps the W columns (e.g. 4 -> W1..W4); label_fn(week_idx) can
+    replace the query's week label."""
     mat = [(rc, lbl) for rc, lbl in _COHORT_MATURITY_COLS if rev_rows and rc in rev_rows[0]]
+    if max_weeks:
+        mat = mat[:int(max_weeks)]
     week_cols = [lbl for _, lbl in mat]
 
     # Blank out maturity windows that haven't fully elapsed yet. Wn covers
@@ -159,7 +163,7 @@ def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor):
                 cells[lbl] = {"text": f"{pct:.0f}%", "color": _roi_color(pct)}
         parsed.append({
             "week_idx": r.get("week_idx", ""),
-            "week": r.get("week", ""),
+            "week": (label_fn(int(wi)) if (label_fn and wi is not None) else r.get("week", "")),
             "Registration": _fmt_number(r.get("registrations")),
             "Amount_Spent_display": (f"{int(round(spend)):,}" if spend else ""),
             "week_cells": cells,
@@ -184,8 +188,10 @@ def _meta_user_where(meta_ids=None, meta_exclude_ids=None):
     """Meta users in the segment: either an explicit campaign list, or every
     facebook campaign except the excluded ones (the 'all Real Estate' rule)."""
     if meta_exclude_ids:
+        # numeric-id guard drops broken '{{campaign.id}}' template tags
         return (f"(u.utm_source='facebook' "
-                f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(meta_exclude_ids)}))")
+                f"and coalesce({_UTM_CAMPAIGN_ID},'') regexp '^[0-9]+$' "
+                f"and {_UTM_CAMPAIGN_ID} not in ({_ids_sql(meta_exclude_ids)}))")
     return f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({_ids_sql(meta_ids or [])}))"
 
 
@@ -197,7 +203,7 @@ def _combined_cohort_rev_sql(anchor, google_exclude_ids, meta_ids=None, meta_exc
         f"{_meta_user_where(meta_ids, meta_exclude_ids)} "
         f"or (u.utm_source in ('google','google-ads') "
         f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(google_exclude_ids)}))"
-        f") and u.created_at >= (select start_date from anchor)"
+        f") and u.deleted_at is null and u.created_at >= (select start_date from anchor)"
     )
     return f"""
 with anchor as (select date '{anchor}' as start_date),
@@ -317,7 +323,10 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
     for wi in set(meta_spend) | set(google_spend):
         spend_by_wi[wi] = meta_spend.get(wi, 0.0) + google_spend.get(wi, 0.0)
 
-    week_cols, parsed = _cohort_ratio_rows(rev_rows, spend_by_wi, anchor)
+    label_fn = ((lambda wi: _cohort_label_long(anchor, wi))
+                if slide_cfg.get("week_label_style") == "long" else None)
+    week_cols, parsed = _cohort_ratio_rows(rev_rows, spend_by_wi, anchor,
+                                           max_weeks=slide_cfg.get("max_weeks"), label_fn=label_fn)
     for r in rev_rows:
         wi = int(_q_num(r.get("week_idx")) or 0)
         print(f"         {r.get('week')}: reg {r.get('registrations')} "
@@ -326,7 +335,8 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
               f"W1 ${_q_num(r.get('W1_rev')) or 0:,.0f}")
     print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (Meta+Google revenue/spend), cols: {week_cols}")
     return {"title": title, "render": "cohort_table", "skipped": False,
-            "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note")}
+            "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note"),
+            "headers": slide_cfg.get("headers") or {}}
 
 
 
@@ -526,6 +536,14 @@ WHERE u.utm_source IN ('google', 'google-ads')
 # segment we can't reconstruct from raw tables); the Google half is computed
 # live from db 74 + Supermetrics on the same grid.
 _META_ANCHOR = "2025-08-06"   # Wednesday; question 8341's cohort anchor
+
+
+def _cohort_label_long(anchor_str, widx):
+    """'29 July to 4 August' — the manual deck's row label style."""
+    a = datetime.date.fromisoformat(anchor_str)
+    start = a + datetime.timedelta(days=int(widx) * 7)
+    end = start + datetime.timedelta(days=6)
+    return f"{start.day} {start.strftime('%B')} to {end.day} {end.strftime('%B')}"
 
 
 def _cohort_label(anchor_str, widx):

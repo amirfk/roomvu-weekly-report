@@ -47,9 +47,12 @@ slides:
   #   revenue/regs = cohort users tagged with any non-excluded campaign
   #   spend        = Meta ad_analytics (8516 shape) + Google Supermetrics daily
   - id: re_mb_roi_meta_google
-    title: "Meta & Google · Real Estate & Mortgage Brokers — ROI Cohort (Weekly)"
+    title: "Real estate + MB Cohort ROI - Meta & Google"
     render: cohort_combined
     cohort_anchor: "2026-05-06"
+    max_weeks: 4                # manual deck shows W1..W4
+    week_label_style: long      # "29 July to 4 August"
+    headers: {week: "", registrations: "Registration", spend: "Amount Spent"}
     revenue_database_id: 6      # roomview-website (users/financials)
     spend_database_id: 74       # roomvu_ads_metrics (ad_analytics)
     meta_exclude_campaigns:     # Meta = everything except these verticals
@@ -63,7 +66,7 @@ slides:
       - "22448879276"           # RV - Registration - Financial Advisors
       - "23737726709"           # RV - Registration - Competitors [Insurance Agent]
       - "23735196152"           # RV - Registration - Competitors [Financial Advisor]
-    note: "Real Estate + MB = all Meta and Google campaigns except the Insurance / Financial verticals (incl. Meta Create, Biocoach, Retargeting, Integrations). Cells = combined cumulative revenue ÷ combined spend (Meta ad_analytics + Google Supermetrics)."
+    note: "Real Estate + MB = all Meta and Google campaigns except the Insurance / Financial verticals (incl. Meta Create, Biocoach, Retargeting, Integrations); deleted accounts excluded. Cells = combined cumulative revenue ÷ combined spend (Meta ad_analytics + Google Supermetrics)."
 
   # ── Meta KPI slides (Metabase) ────────────────────────────────
   - id: meta_insurance_kpi

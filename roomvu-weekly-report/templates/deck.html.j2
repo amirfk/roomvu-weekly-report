@@ -442,9 +442,9 @@
           <table class="cohort">
             <thead>
               <tr>
-                <th class="col-left">Week</th>
-                <th>Registrations</th>
-                <th>Amount Spent</th>
+                <th class="col-left">{{ slide.headers.week if slide.headers and slide.headers.week is defined else 'Week' }}</th>
+                <th>{{ slide.headers.registrations if slide.headers and slide.headers.registrations is defined else 'Registrations' }}</th>
+                <th>{{ slide.headers.spend if slide.headers and slide.headers.spend is defined else 'Amount Spent' }}</th>
                 {% for wc in slide.week_cols %}
                 <th>{{ wc }}</th>
                 {% endfor %}
