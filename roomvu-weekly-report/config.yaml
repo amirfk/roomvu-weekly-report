@@ -18,11 +18,23 @@ slides:
     revenue_q: 8515            # Meta – Insurance ROI Cohort — REVENUE (db 6)
     spend_q: 8516              # Meta – Insurance ROI Cohort — SPEND (db 74)
     cohort_anchor: "2026-05-06"  # anchor in 8515/8516; blanks immature Wn windows
+  # 8271 ran on db 74 (users copy incomplete) -> computed live: revenue/regs on
+  # db 6, ad_analytics spend on db 74, same campaign set and cohort shape.
   - id: financial_planners_roi
-    metabase_question: 8271
     title: "Meta · Financial Planners — ROI Cohort (Weekly)"
-    render: cohort_table
+    render: cohort_combined
     platform: meta
+    cohort_anchor: "2026-05-06"
+    exclude_deleted: false      # parity with 8515/8517-style cohorts
+    revenue_database_id: 6
+    spend_database_id: 74
+    meta_campaigns:             # Financial / Finance campaigns (from question 8271)
+      - "120221486897610626"
+      - "120228300262780626"
+      - "120236599108480603"
+      - "120236934764070603"    # Finance Registration - Advantage - USD
+      - "120247201100520626"
+      - "120250806358890603"    # Finance Registration - LAL - USD
   - id: realtors_roi
     title: "Meta · Realtors — ROI Cohort (Weekly)"
     render: cohort_ratio
@@ -30,11 +42,17 @@ slides:
     revenue_q: 8517            # REALTOR REVENUE (db 6)
     spend_q: 8518              # REALTOR SPEND (db 74)
     cohort_anchor: "2026-05-06"
+  # 8280 ran on db 74 -> computed live (see financial_planners_roi).
   - id: mortgage_roi
-    metabase_question: 8280
     title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
-    render: cohort_table
+    render: cohort_combined
     platform: meta
+    cohort_anchor: "2026-05-06"
+    exclude_deleted: false
+    revenue_database_id: 6
+    spend_database_id: 74
+    meta_campaigns:
+      - "120233281815980603"    # Mortgage Broker
 
   # Real Estate & Mortgage Broker across BOTH platforms, on the same weekly
   # cohort grid / W1..W5 maturity windows as 8515–8518. Computed live because
@@ -116,16 +134,18 @@ slides:
         format: currency
         color: "#6B7FD4"
 
+  # 8340 ran on db 74 (users copy incomplete) -> same SQL live on db 6.
   - id: meta_realestate_sub_rate
     title: "Meta - Real Estate & MB Subscription Rate"
     render: line_chart
     platform: meta
     charts:
       - label: "Subscription Rate"
-        source: metabase
-        metabase_question: 8340
+        source: meta_sub_rate_live
+        database_id: 6
+        anchor: "2025-08-06"
+        campaign_ids: ["120231753483890603", "120233281815980603"]
         x_field: week
-        y_field: subscription_rate_pct
         format: percent
         color: "#6B7FD4"
 
@@ -145,16 +165,21 @@ slides:
         format: percent
         color: "#4A90D9"
 
+  # 8343 ran on db 74 (users copy incomplete) -> spend from 8338 (db 74) /
+  # registrations counted live on db 6 with 8343's segment rule.
   - id: meta_realestate_cpa
     title: "Meta - Real Estate Acquisition CPA"
     render: line_chart
     platform: meta
     charts:
       - label: "CPA"
-        source: metabase
-        metabase_question: 8343
+        source: meta_cpa_live
+        database_id: 6
+        anchor: "2025-08-06"
+        campaign_ids: ["120231753483890603", "120233281815980603"]
+        spend_question: 8338              # Meta - Real Estate & MB Spend (week, amount_spent)
+        decimals: 2
         x_field: week
-        y_field: cpa
         format: currency
         color: "#E8A020"
 

@@ -66,3 +66,18 @@ def fetch_question(question_id: int, url_env: str, key_env: str,
         body["parameters"] = parameters
     resp = _post(endpoint, {"X-API-KEY": api_key, "Content-Type": "application/json"}, body)
     return resp.json()
+
+
+def fetch_card_sql(question_id: int, url_env: str, key_env: str):
+    """Return (native_sql, database_id) of a saved question via GET /api/card/{id}."""
+    base_url = os.environ.get(url_env, "").rstrip("/")
+    api_key = os.environ.get(key_env, "")
+    resp = requests.get(f"{base_url}/api/card/{question_id}", headers={"X-API-KEY": api_key}, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    card = resp.json()
+    dq = card.get("dataset_query", {})
+    stage = (dq.get("stages") or [{}])[0]
+    sql = stage.get("native") or dq.get("native", {}).get("query", "")
+    if not sql:
+        raise ValueError(f"card {question_id} has no native SQL")
+    return sql, dq.get("database")

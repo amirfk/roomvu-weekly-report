@@ -6,7 +6,7 @@ import yaml
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-from metabase_client import fetch_question, execute_sql
+from metabase_client import fetch_question, execute_sql, fetch_card_sql
 import supermetrics_client as sm
 
 ROOT = Path(__file__).parent
@@ -195,16 +195,17 @@ def _meta_user_where(meta_ids=None, meta_exclude_ids=None):
     return f"(u.utm_source='facebook' and {_UTM_CAMPAIGN_ID} in ({_ids_sql(meta_ids or [])}))"
 
 
-def _combined_cohort_rev_sql(anchor, google_exclude_ids, meta_ids=None, meta_exclude_ids=None, limit_rows=5):
+def _combined_cohort_rev_sql(anchor, google_exclude_ids=None, meta_ids=None, meta_exclude_ids=None,
+                             limit_rows=5, include_google=True, exclude_deleted=True):
     # utm_campaign may lack the "<id>-..." shape; coalesce -> '' keeps those
     # users in the segment (only explicitly tagged excluded campaigns drop).
-    segment = (
-        f"u.user_type_id != 1 and ("
-        f"{_meta_user_where(meta_ids, meta_exclude_ids)} "
-        f"or (u.utm_source in ('google','google-ads') "
-        f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(google_exclude_ids)}))"
-        f") and u.deleted_at is null and u.created_at >= (select start_date from anchor)"
-    )
+    channels = _meta_user_where(meta_ids, meta_exclude_ids)
+    if include_google:
+        channels += (f" or (u.utm_source in ('google','google-ads') "
+                     f"and coalesce({_UTM_CAMPAIGN_ID},'') not in ({_ids_sql(google_exclude_ids or [])}))")
+    deleted = " and u.deleted_at is null" if exclude_deleted else ""
+    segment = (f"u.user_type_id != 1 and ({channels}){deleted} "
+               f"and u.created_at >= (select start_date from anchor)")
     return f"""
 with anchor as (select date '{anchor}' as start_date),
 cohort_users as (
@@ -309,10 +310,15 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
     rev_db = int(slide_cfg.get("revenue_database_id", 6))
     spend_db = int(slide_cfg.get("spend_database_id", 74))
 
+    include_google = bool(g_excl or g_incl or slide_cfg.get("include_google"))
     rev_rows = execute_sql(_combined_cohort_rev_sql(anchor, g_excl, meta_ids, meta_excl,
-                                                    limit_rows=slide_cfg.get("rows", 5)), rev_db, url_env, key_env)
+                                                    limit_rows=slide_cfg.get("rows", 5),
+                                                    include_google=include_google,
+                                                    exclude_deleted=slide_cfg.get("exclude_deleted", True)),
+                           rev_db, url_env, key_env)
     meta_spend_rows = execute_sql(_meta_cohort_spend_sql(anchor, meta_ids, meta_excl), spend_db, url_env, key_env)
-    google_spend = _google_spend_by_cohort(anchor, exclude_ids=g_excl, include_ids=g_incl)
+    google_spend = (_google_spend_by_cohort(anchor, exclude_ids=g_excl, include_ids=g_incl)
+                    if include_google else {})
 
     meta_spend = {}
     for r in meta_spend_rows:
@@ -332,9 +338,10 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
         wi = int(_q_num(r.get("week_idx")) or 0)
         print(f"         {r.get('week')}: reg {r.get('registrations')} "
               f"(meta {r.get('meta_reg')}, google {r.get('google_reg')}) | "
-              f"spend meta ${meta_spend.get(wi, 0):,.0f} + google ${google_spend.get(wi, 0):,.0f} | "
+              f"spend meta ${meta_spend.get(wi, 0):,.0f}"
+              f"{f' + google ${google_spend.get(wi, 0):,.0f}' if include_google else ''} | "
               f"W1 ${_q_num(r.get('W1_rev')) or 0:,.0f}")
-    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows (Meta+Google revenue/spend), cols: {week_cols}")
+    print(f"  [OK]   '{title}' — {len(parsed)} cohort rows ({'Meta+Google' if include_google else 'Meta'} revenue/spend, live), cols: {week_cols}")
     return {"title": title, "render": "cohort_table", "skipped": False,
             "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note"),
             "headers": slide_cfg.get("headers") or {}}
@@ -950,10 +957,17 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
     last_start = (week_start - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     last_end   = week_start.strftime("%Y-%m-%d")
 
+    def run_card(qid, start, end):
+        """Execute the saved question's own SQL with {{start_date}}/{{end_date}}
+        inlined, on the card's database (avoids the template-parameter API,
+        which returns 400 for card 8346)."""
+        sql, db = fetch_card_sql(qid, url_env, key_env)
+        sql = sql.replace("{{start_date}}", f"'{start}'").replace("{{end_date}}", f"'{end}'")
+        return execute_sql(sql, int(db), url_env, key_env)
+
     def fetch_week(start, end):
-        params = _date_params(start, end)
-        spend_rows = fetch_question(qid_spend, url_env, key_env, parameters=params)
-        reg_rows   = fetch_question(qid_reg,   url_env, key_env, parameters=params)
+        spend_rows = run_card(qid_spend, start, end)
+        reg_rows   = run_card(qid_reg,   start, end)
         print(f"    spend cols: {list(spend_rows[0].keys()) if spend_rows else '[]'}")
         print(f"    reg cols:   {list(reg_rows[0].keys())  if reg_rows  else '[]'}")
         return _merge_region_rows(spend_rows, reg_rows)
@@ -1251,6 +1265,36 @@ order by week_idx
 """.strip()
 
 
+def _meta_weekly_sub_rate_sql(anchor, campaign_ids):
+    """Question 8340's subscription-rate SQL (registrations vs active subs by
+    registration week) parameterised by anchor + campaigns, for db 6."""
+    ids = ",".join(f"'{c}'" for c in campaign_ids)
+    seg = (f"u.user_type_id != 1 and u.utm_source='facebook' and u.utm_medium='paidsocial' "
+           f"and substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1) in ({ids}) "
+           f"and u.created_at >= (select start_date from anchor)")
+    return f"""
+with anchor as (select date '{anchor}' as start_date),
+regs as (
+  select floor(datediff(u.created_at,(select start_date from anchor))/7) as week_idx,
+         count(distinct u.id) as registrations
+  from users u where {seg} group by 1
+),
+subs as (
+  select floor(datediff(u.created_at,(select start_date from anchor))/7) as week_idx,
+         count(distinct us.user_id) as subscriptions
+  from user_subscription us join users u on u.id = us.user_id
+  where {seg} and us.status = 1 group by 1
+)
+select concat(date_format((select start_date from anchor) + interval (rg.week_idx*7) day, '%e %b'), ' - ',
+              date_format((select start_date from anchor) + interval (rg.week_idx*7 + 6) day, '%e %b')) as week,
+       rg.week_idx, rg.registrations, coalesce(sb.subscriptions,0) as subscriptions,
+       round(100 * coalesce(sb.subscriptions,0) / nullif(rg.registrations,0), 2) as subscription_rate_pct
+from regs rg left join subs sb on sb.week_idx = rg.week_idx
+where (select start_date from anchor) + interval (rg.week_idx*7 + 7) day <= curdate()
+order by rg.week_idx
+""".strip()
+
+
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     """Fetch one chart's data. Returns (labels, values)."""
     source = chart_cfg["source"]
@@ -1357,6 +1401,13 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
             values.append(round(spend_map[w] / regs, 2) if regs else 0)
         return labels, values
 
+    elif source == "meta_sub_rate_live":
+        # Question 8340 ran on db 74, whose users copy is incomplete; same SQL on db 6.
+        rows = execute_sql(_meta_weekly_sub_rate_sql(chart_cfg["anchor"], chart_cfg["campaign_ids"]),
+                           chart_cfg.get("database_id", 6), url_env, key_env)
+        return ([str(r.get("week")) for r in rows],
+                [float(r.get("subscription_rate_pct") or 0) for r in rows])
+
     elif source in ("meta_regs_live", "meta_cpa_live"):
         # Registrations counted live on the production db (the roomvu_ads_metrics
         # users copy is incomplete for recent weeks: 181 vs 325 for 2-8 Sep 2026),
@@ -1377,7 +1428,8 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
             if w not in spend_map:
                 continue
             labels.append(w)
-            values.append(round(spend_map[w] / reg_map[w]) if reg_map[w] else 0)
+            dec = int(chart_cfg.get("decimals", 0))
+            values.append(round(spend_map[w] / reg_map[w], dec) if reg_map[w] else 0)
         return labels, values
 
     elif source == "metabase":
@@ -1453,26 +1505,10 @@ def build_chart_slide(slide_cfg, url_env=None, key_env=None):
 
 # ── Main build ────────────────────────────────────────────────────────────────
 
-def _diag_cards(url_env, key_env, ids):   # TEMP diagnostic
-    import requests
-    base = os.environ.get(url_env, "").rstrip("/"); key = os.environ.get(key_env, "")
-    for qid in ids:
-        try:
-            card = requests.get(f"{base}/api/card/{qid}", headers={"X-API-KEY": key}, timeout=60).json()
-            dq = card.get("dataset_query", {})
-            st = (dq.get("stages") or [{}])[0]
-            sql = st.get("native") or dq.get("native", {}).get("query", "")
-            print(f"  [DIAG] card {qid} '{card.get('name')}' db={dq.get('database')}")
-            print("  [DIAG] SQL: " + " ".join(str(sql).split()))
-        except Exception as exc:
-            print(f"  [DIAG] card {qid} failed: {exc}")
-
-
 def build():
     cfg = load_config()
     url_env = cfg["metabase_url_env"]
     key_env = cfg["metabase_api_key_env"]
-    _diag_cards(url_env, key_env, [8271, 8280, 8332, 8333, 8334, 8335, 8336, 8337, 8338, 8340, 8341, 8342, 8343, 8346, 8347])   # TEMP
     fixed_cols = cfg["fixed_columns"]
 
     # Pass account IDs to env so supermetrics_client picks them up
