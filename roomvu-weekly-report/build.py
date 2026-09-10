@@ -1402,10 +1402,27 @@ def build_chart_slide(slide_cfg, url_env=None, key_env=None):
 
 # ── Main build ────────────────────────────────────────────────────────────────
 
+def _diag_cards(url_env, key_env, ids):   # TEMP diagnostic
+    import requests
+    base = os.environ.get(url_env, "").rstrip("/"); key = os.environ.get(key_env, "")
+    for qid in ids:
+        try:
+            card = requests.get(f"{base}/api/card/{qid}", headers={"X-API-KEY": key}, timeout=60).json()
+            dq = card.get("dataset_query", {})
+            print(f"  [DIAG] card {qid} '{card.get('name')}' db={dq.get('database')}")
+            print("  [DIAG] SQL: " + " ".join(str(dq.get("native", {}).get("query", "")).split()))
+            rows = fetch_question(qid, url_env, key_env)
+            for r in rows[-3:]:
+                print(f"  [DIAG] row: {r}")
+        except Exception as exc:
+            print(f"  [DIAG] card {qid} failed: {exc}")
+
+
 def build():
     cfg = load_config()
     url_env = cfg["metabase_url_env"]
     key_env = cfg["metabase_api_key_env"]
+    _diag_cards(url_env, key_env, [8345, 8330, 8331, 8344])   # TEMP
     fixed_cols = cfg["fixed_columns"]
 
     # Pass account IDs to env so supermetrics_client picks them up
