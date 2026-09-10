@@ -171,23 +171,30 @@ slides:
         format: currency
         color: "#6B7FD4"
 
+  # Registrations are counted live on db 6 with question 8345's segment rule
+  # (utm facebook/paidsocial, insurance campaigns, user_type_id != 1) because
+  # 8345 runs on db 74 whose users copy misses recent registrations (181 vs 325
+  # for 2-8 Sep 2026 -> CPA $67 instead of $37). Spend stays on 8344 (db 74).
   - id: meta_insurance_cpa_register
     title: "Meta - Insurance Agents CPA & Register Weekly"
     render: dual_line_chart
     platform: meta
     charts:
       - label: "Registrations"
-        source: metabase
-        metabase_question: 8345
+        source: meta_regs_live
+        database_id: 6
+        anchor: "2025-11-05"              # 8345's first week
+        campaign_ids: ["120218175521230626", "120227402303430626", "120233992944810603"]
         x_field: week
-        y_field: Register
         format: number
         color: "#E8956D"
       - label: "CPA"
-        source: metabase
-        metabase_question: 8345
+        source: meta_cpa_live
+        database_id: 6
+        anchor: "2025-11-05"
+        campaign_ids: ["120218175521230626", "120227402303430626", "120233992944810603"]
+        spend_question: 8344              # weekly insurance spend (week, amount_spent)
         x_field: week
-        y_field: CPA
         format: currency
         color: "#E8C84A"
 

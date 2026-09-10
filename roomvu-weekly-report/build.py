@@ -782,10 +782,14 @@ def _fin_row_spend(row, ws, wi, url_env=None, key_env=None):
                 total += float(x.get("Cost", 0) or 0)
         return round(total, 2)
     if row.get("spend_linkedin"):
-        total = 0.0
-        for x in sm.fetch_linkedin_ads(["Cost"], start_date=ws, end_date=wi):
-            total += float(x.get("Cost", 0) or 0)
-        return round(total, 2)
+        try:
+            total = 0.0
+            for x in sm.fetch_linkedin_ads(["Cost"], start_date=ws, end_date=wi):
+                total += float(x.get("Cost", 0) or 0)
+            return round(total, 2)
+        except Exception as exc:                 # quota/outage -> data gap, not a dead slide
+            print(f"  [WARN] LinkedIn spend unavailable: {str(exc)[:90]}")
+            return None
     return None  # no live source → data gap
 
 
@@ -1223,6 +1227,30 @@ def _wed_label(ws):
     return f"{ws.strftime('%d %b')} - {end.strftime('%d %b')}"
 
 
+def _meta_weekly_regs_sql(anchor, campaign_ids):
+    """Weekly Meta registrations for a campaign set - question 8345's `regs`
+    CTE and label format, complete weeks only."""
+    ids = ",".join(f"'{c}'" for c in campaign_ids)
+    return f"""
+with anchor as (select date '{anchor}' as start_date),
+regs as (
+  select floor(datediff(u.created_at,(select start_date from anchor))/7) as week_idx,
+         count(distinct u.id) as registrations
+  from users u
+  where u.user_type_id != 1 and u.utm_source='facebook' and u.utm_medium='paidsocial'
+    and substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1) in ({ids})
+    and u.created_at >= (select start_date from anchor)
+  group by 1
+)
+select concat(date_format((select start_date from anchor) + interval (week_idx*7) day, '%e %b'), ' - ',
+              date_format((select start_date from anchor) + interval (week_idx*7 + 6) day, '%e %b')) as week,
+       week_idx, registrations
+from regs
+where (select start_date from anchor) + interval (week_idx*7 + 7) day <= curdate()
+order by week_idx
+""".strip()
+
+
 def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
     """Fetch one chart's data. Returns (labels, values)."""
     source = chart_cfg["source"]
@@ -1329,6 +1357,29 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
             values.append(round(spend_map[w] / regs, 2) if regs else 0)
         return labels, values
 
+    elif source in ("meta_regs_live", "meta_cpa_live"):
+        # Registrations counted live on the production db (the roomvu_ads_metrics
+        # users copy is incomplete for recent weeks: 181 vs 325 for 2-8 Sep 2026),
+        # with question 8345's exact segment definition. CPA = weekly spend
+        # question (ad_analytics, db 74) / those registrations, joined on the
+        # week label both sides build from the same Wednesday anchor.
+        reg_rows = execute_sql(_meta_weekly_regs_sql(chart_cfg["anchor"], chart_cfg["campaign_ids"]),
+                               chart_cfg.get("database_id", 6), url_env, key_env)
+        order = [str(r.get("week")) for r in reg_rows]
+        reg_map = {str(r.get("week")): float(r.get("registrations") or 0) for r in reg_rows}
+        if source == "meta_regs_live":
+            return order, [reg_map[w] for w in order]
+        spend_field = chart_cfg.get("spend_field", "amount_spent")
+        spend_map = {str(r.get("week")): float(r.get(spend_field) or 0)
+                     for r in fetch_question(chart_cfg["spend_question"], url_env, key_env)}
+        labels, values = [], []
+        for w in order:
+            if w not in spend_map:
+                continue
+            labels.append(w)
+            values.append(round(spend_map[w] / reg_map[w]) if reg_map[w] else 0)
+        return labels, values
+
     elif source == "metabase":
         qid = chart_cfg["metabase_question"]
         rows = fetch_question(qid, url_env, key_env)
@@ -1402,37 +1453,10 @@ def build_chart_slide(slide_cfg, url_env=None, key_env=None):
 
 # ── Main build ────────────────────────────────────────────────────────────────
 
-def _diag_cards(url_env, key_env, ids):   # TEMP diagnostic
-    import requests
-    base = os.environ.get(url_env, "").rstrip("/"); key = os.environ.get(key_env, "")
-    for qid in ids:
-        try:
-            card = requests.get(f"{base}/api/card/{qid}", headers={"X-API-KEY": key}, timeout=60).json()
-            dq = card.get("dataset_query", {})
-            st = (dq.get("stages") or [{}])[0]
-            sql = st.get("native") or dq.get("native", {}).get("query", "")
-            print(f"  [DIAG] card {qid} '{card.get('name')}' db={dq.get('database')}")
-            print("  [DIAG] SQL: " + " ".join(str(sql).split()))
-        except Exception as exc:
-            print(f"  [DIAG] card {qid} failed: {exc}")
-    ins = "('120233992944810603','120218175521230626','120227402303430626')"
-    cnt = ("select count(*) as n, count(distinct id) as nd from users u where u.utm_source='facebook' "
-           "and substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1) in " + ins +
-           " and u.created_at >= '2026-09-02' and u.created_at < '2026-09-09'")
-    for db in (6, 74):
-        try:
-            print(f"  [DIAG] db{db} insurance regs 2-8 Sep (no type filter): {execute_sql(cnt, db, url_env, key_env)}")
-            print(f"  [DIAG] db{db} + user_type_id!=1: {execute_sql(cnt + ' and u.user_type_id != 1', db, url_env, key_env)}")
-            print(f"  [DIAG] db{db} users max(created_at)/count: {execute_sql('select max(created_at) as mx, count(*) as n from users', db, url_env, key_env)}")
-        except Exception as exc:
-            print(f"  [DIAG] db{db} failed: {exc}")
-
-
 def build():
     cfg = load_config()
     url_env = cfg["metabase_url_env"]
     key_env = cfg["metabase_api_key_env"]
-    _diag_cards(url_env, key_env, [8345, 8330, 8331, 8344])   # TEMP
     fixed_cols = cfg["fixed_columns"]
 
     # Pass account IDs to env so supermetrics_client picks them up
