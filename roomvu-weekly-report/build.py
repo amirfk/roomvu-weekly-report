@@ -788,7 +788,7 @@ def _fin_row_spend(row, ws, wi, url_env=None, key_env=None):
                 total += float(x.get("Cost", 0) or 0)
             return round(total, 2)
         except Exception as exc:                 # quota/outage -> data gap, not a dead slide
-            print(f"  [WARN] LinkedIn spend unavailable: {str(exc)[:90]}")
+            print(f"  [WARN] LinkedIn spend unavailable: {str(exc)[:400]}")
             return None
     return None  # no live source → data gap
 

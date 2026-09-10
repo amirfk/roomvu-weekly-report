@@ -1,7 +1,30 @@
 import os
+import time
 import requests
 
-_TIMEOUT = 60
+_TIMEOUT = 120
+_RETRIES = 2          # heavy cohort cards occasionally exceed the read timeout
+
+
+def _post(endpoint, headers, body):
+    """POST with retries on timeouts / connection errors / 5xx."""
+    last = None
+    for attempt in range(_RETRIES + 1):
+        try:
+            resp = requests.post(endpoint, headers=headers, json=body, timeout=_TIMEOUT)
+            if resp.status_code >= 500:
+                raise requests.HTTPError(f"{resp.status_code} Server Error for url: {endpoint}", response=resp)
+            resp.raise_for_status()
+            return resp
+        except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
+            last = exc
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status is not None and status < 500:
+                raise                                  # 4xx is not transient
+            if attempt < _RETRIES:
+                print(f"  [WARN] Metabase {endpoint.rsplit('/api/', 1)[-1]} attempt {attempt + 1} failed ({str(exc)[:60]}); retrying")
+                time.sleep(5 * (attempt + 1))
+    raise last
 
 
 def execute_sql(sql: str, database_id: int, url_env: str, key_env: str) -> list[dict]:
@@ -14,13 +37,8 @@ def execute_sql(sql: str, database_id: int, url_env: str, key_env: str) -> list[
         raise EnvironmentError(f"Environment variable {key_env} is not set")
 
     endpoint = f"{base_url}/api/dataset"
-    resp = requests.post(
-        endpoint,
-        headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-        json={"database": database_id, "type": "native", "native": {"query": sql}},
-        timeout=_TIMEOUT,
-    )
-    resp.raise_for_status()
+    resp = _post(endpoint, {"X-API-KEY": api_key, "Content-Type": "application/json"},
+                 {"database": database_id, "type": "native", "native": {"query": sql}})
     payload = resp.json()
     # Metabase returns {data: {cols: [...], rows: [...]}}
     data = payload.get("data", {})
@@ -46,11 +64,5 @@ def fetch_question(question_id: int, url_env: str, key_env: str,
     body = {}
     if parameters:
         body["parameters"] = parameters
-    resp = requests.post(
-        endpoint,
-        headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-        json=body,
-        timeout=_TIMEOUT,
-    )
-    resp.raise_for_status()
+    resp = _post(endpoint, {"X-API-KEY": api_key, "Content-Type": "application/json"}, body)
     return resp.json()
