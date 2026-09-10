@@ -1409,13 +1409,23 @@ def _diag_cards(url_env, key_env, ids):   # TEMP diagnostic
         try:
             card = requests.get(f"{base}/api/card/{qid}", headers={"X-API-KEY": key}, timeout=60).json()
             dq = card.get("dataset_query", {})
+            st = (dq.get("stages") or [{}])[0]
+            sql = st.get("native") or dq.get("native", {}).get("query", "")
             print(f"  [DIAG] card {qid} '{card.get('name')}' db={dq.get('database')}")
-            print("  [DIAG] SQL: " + " ".join(str(dq.get("native", {}).get("query", "")).split()))
-            rows = fetch_question(qid, url_env, key_env)
-            for r in rows[-3:]:
-                print(f"  [DIAG] row: {r}")
+            print("  [DIAG] SQL: " + " ".join(str(sql).split()))
         except Exception as exc:
             print(f"  [DIAG] card {qid} failed: {exc}")
+    ins = "('120233992944810603','120218175521230626','120227402303430626')"
+    cnt = ("select count(*) as n, count(distinct id) as nd from users u where u.utm_source='facebook' "
+           "and substr(u.utm_campaign,1,position('-' in u.utm_campaign)-1) in " + ins +
+           " and u.created_at >= '2026-09-02' and u.created_at < '2026-09-09'")
+    for db in (6, 74):
+        try:
+            print(f"  [DIAG] db{db} insurance regs 2-8 Sep (no type filter): {execute_sql(cnt, db, url_env, key_env)}")
+            print(f"  [DIAG] db{db} + user_type_id!=1: {execute_sql(cnt + ' and u.user_type_id != 1', db, url_env, key_env)}")
+            print(f"  [DIAG] db{db} users max(created_at)/count: {execute_sql('select max(created_at) as mx, count(*) as n from users', db, url_env, key_env)}")
+        except Exception as exc:
+            print(f"  [DIAG] db{db} failed: {exc}")
 
 
 def build():
