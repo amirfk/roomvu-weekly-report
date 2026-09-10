@@ -221,7 +221,8 @@ def fetch_google_ads(fields, date_range_type="last_year_inc",
 def fetch_linkedin_ads(fields, date_range_type="last_year_inc",
                        start_date=None, end_date=None, settings=None):
     account_id = os.environ.get("LINKEDIN_ADS_ACCOUNT_ID", "508540143")
-    return fetch("LI", account_id, fields, date_range_type, start_date, end_date, settings)
+    # "LIA" = LinkedIn Ads. ("LI" is rejected by the REST API: PARAM_TYPE_INVALID_DATA_SOURCE_ID.)
+    return fetch("LIA", account_id, fields, date_range_type, start_date, end_date, settings)
 
 
 def format_week_label(iso_week):
