@@ -137,10 +137,10 @@ def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor, max_weeks=None, label_fn=N
         mat = mat[:int(max_weeks)]
     week_cols = [lbl for _, lbl in mat]
 
-    # Blank out maturity windows that haven't fully elapsed yet. Wn covers
-    # [cohort_start, cohort_start + (7n+1) days); it is complete only once today
-    # has reached that upper bound, otherwise the query just repeats a partial
-    # cumulative number.
+    # Blank out maturity windows whose n-th week hasn't elapsed yet. Wn covers
+    # [cohort_start, cohort_start + (7n+1) days); it is shown once the n-th
+    # week is over (today >= start + 7n) so the just-ended week appears on the
+    # Wednesday run; the +1 grace day is picked up by Thursday's rebuild.
     anchor_date = datetime.date.fromisoformat(anchor) if anchor else None
     today = datetime.date.today()
 
@@ -154,7 +154,7 @@ def _cohort_ratio_rows(rev_rows, spend_by_wi, anchor, max_weeks=None, label_fn=N
         for rc, lbl in mat:
             n = int(lbl[1:])   # "W3" -> 3
             mature = (cohort_start is None
-                      or today >= cohort_start + datetime.timedelta(days=7 * n + 1))
+                      or today >= cohort_start + datetime.timedelta(days=7 * n))
             rev = _q_num(r.get(rc))
             if not mature or rev is None or not spend:
                 cells[lbl] = {"text": "", "color": None}
@@ -242,7 +242,7 @@ select * from (
     round(coalesce(r.W3_rev,0),2) as W3_rev, round(coalesce(r.W4_rev,0),2) as W4_rev,
     round(coalesce(r.W5_rev,0),2) as W5_rev
   from reg_cohort rc left join rev r on r.week_idx=rc.week_idx
-  where (select start_date from anchor) + interval (rc.week_idx*7 + 8) day <= curdate()
+  where (select start_date from anchor) + interval (rc.week_idx*7 + 7) day <= curdate()   -- week complete
   order by rc.week_idx desc limit {int(limit_rows)}
 ) t order by t.week_idx asc
 """.strip()

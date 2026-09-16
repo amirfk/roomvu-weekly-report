@@ -11,13 +11,22 @@ deck:
   break_even: 100              # % anchor for red/green split
 
 slides:
+  # All ROI cohorts are computed live (cohort_combined): revenue/registrations
+  # on db 6, ad_analytics spend on db 74 — the exact shape of questions
+  # 8515/8516 — but a cohort week appears as soon as it is complete (Wednesday)
+  # rather than after its 8-day W1 grace window (Thursday).
   - id: insurance_roi
     title: "Meta · Insurance Agents — ROI Cohort (Weekly)"
-    render: cohort_ratio       # cells = revenue (8515) / spend (8516) per cohort week
+    render: cohort_combined
     platform: meta
-    revenue_q: 8515            # Meta – Insurance ROI Cohort — REVENUE (db 6)
-    spend_q: 8516              # Meta – Insurance ROI Cohort — SPEND (db 74)
-    cohort_anchor: "2026-05-06"  # anchor in 8515/8516; blanks immature Wn windows
+    cohort_anchor: "2026-05-06"
+    exclude_deleted: false
+    revenue_database_id: 6
+    spend_database_id: 74
+    meta_campaigns:             # Insurance campaigns (as in 8515/8516)
+      - "120218175521230626"    # Insurance Registration - Advantage+
+      - "120227402303430626"    # Insurance Registration
+      - "120233992944810603"    # Insurance Registration - USD
   # 8271 ran on db 74 (users copy incomplete) -> computed live: revenue/regs on
   # db 6, ad_analytics spend on db 74, same campaign set and cohort shape.
   - id: financial_planners_roi
@@ -37,11 +46,14 @@ slides:
       - "120250806358890603"    # Finance Registration - LAL - USD
   - id: realtors_roi
     title: "Meta · Realtors — ROI Cohort (Weekly)"
-    render: cohort_ratio
+    render: cohort_combined
     platform: meta
-    revenue_q: 8517            # REALTOR REVENUE (db 6)
-    spend_q: 8518              # REALTOR SPEND (db 74)
     cohort_anchor: "2026-05-06"
+    exclude_deleted: false
+    revenue_database_id: 6
+    spend_database_id: 74
+    meta_campaigns:
+      - "120231753483890603"    # Realtor (as in 8517/8518)
   # 8280 ran on db 74 -> computed live (see financial_planners_roi).
   - id: mortgage_roi
     title: "Meta · Mortgage Brokers — ROI Cohort (Weekly)"
