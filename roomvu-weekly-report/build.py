@@ -1168,7 +1168,7 @@ _GOOGLE_ACQ_SPEND_FALLBACK = {
 # Question 8473 "google register" (db 6, roomview-website), verbatim definition.
 _GOOGLE_8473_REG_SQL = """
 SELECT
-  DATE(DATE_SUB(users.created_at, INTERVAL MOD(DATEDIFF(users.created_at, '2026-01-07'), 7) DAY)) AS week_start,
+  DATE_ADD('2026-01-07', INTERVAL FLOOR(DATEDIFF(users.created_at, '2026-01-07') / 7) * 7 DAY) AS week_start,
   COUNT(DISTINCT users.id) AS registrations
 FROM users
 WHERE users.user_type_id != 1
@@ -1199,6 +1199,22 @@ def _google_weekly_spend_wed(campaign_ids=None):
         ws = d - datetime.timedelta(days=(d - _GOOGLE_WED_ANCHOR).days % 7)
         out[ws] = out.get(ws, 0.0) + float(r.get("Cost", 0) or 0)
     return out
+
+
+_GOOGLE_IMM_REVENUE_WED_SQL = """
+SELECT
+  DATE_ADD('2026-01-07', INTERVAL FLOOR(DATEDIFF(f.created_at, '2026-01-07') / 7) * 7 DAY) AS week_start,
+  ROUND(SUM(IF(f.currency='CAD', f.amount, f.amount * 1.3)), 2) AS imm_revenue
+FROM users u
+JOIN financials f ON f.user_id = u.id
+WHERE u.utm_source IN ('google', 'google-ads')
+  AND f.gateway_transaction_type IN ('charge.succeeded','SUBSCRIPTION','CHARGE','subcription.succeeded','payment_intent.succeeded')
+  AND f.morph_type LIKE 'SUBSCRIPTION%'
+  AND f.amount >= 1.0
+  AND FLOOR(DATEDIFF(f.created_at, '2026-01-07') / 7) = FLOOR(DATEDIFF(u.created_at, '2026-01-07') / 7)
+  AND f.created_at >= '2025-01-01'
+GROUP BY 1
+""".strip()
 
 
 def _metabase_revenue_wed(question_id, value_field, url_env, key_env):
@@ -1379,6 +1395,17 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
                 for w in weeks
             ],
         )
+
+    elif source == "google_imm_rate_wed":
+        # Immediate revenue (subscription paid in the same Wed-Tue week the
+        # Google user registered; live on db 6) / total Google spend that week.
+        spend_map = _google_weekly_spend_wed()
+        rows = execute_sql(_GOOGLE_IMM_REVENUE_WED_SQL, chart_cfg.get("database_id", 6), url_env, key_env)
+        imm = {datetime.date.fromisoformat(str(r["week_start"])[:10]): float(r.get("imm_revenue") or 0)
+               for r in rows}
+        weeks = _wed_week_window(spend_map, chart_cfg.get("last_weeks"))
+        return ([_wed_label(w) for w in weeks],
+                [round(imm.get(w, 0.0) / spend_map[w] * 100, 2) for w in weeks])
 
     elif source == "google_ads_spend":
         # Total weekly Google Ads spend (all campaigns) from Supermetrics,

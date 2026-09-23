@@ -270,10 +270,8 @@ slides:
           - "17948075953"   # RV - Registration - Competitors
           - "22265795515"   # RV - Registration - Competitors [IDX]
       - label: "Immediate Revenue Rate"
-        source: google_ads_ratio
-        database_id: 74
-        numerator_sql: google_imm_revenue
-        numerator_field: imm_revenue
+        source: google_imm_rate_wed      # Wed-Tue weeks, users/financials on db 6
+        database_id: 6
         x_field: week
         format: percent
         color: "#E8956D"
