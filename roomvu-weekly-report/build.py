@@ -1351,17 +1351,17 @@ def _fetch_chart_data(chart_cfg, url_env=None, key_env=None):
         num_field  = chart_cfg["numerator_field"]
         den_field  = chart_cfg["denominator_field"]
 
-        den_map = {str(r.get(join_field)): r for r in den_rows}
+        # Drive the axis from the denominator (spend) so a week whose cohort
+        # hasn't paid yet shows 0% instead of silently disappearing.
+        num_map = {str(r.get(join_field)): r for r in num_rows}
         labels = []
         values = []
-        for row in num_rows:
-            key = str(row.get(join_field))
-            den_row = den_map.get(key)
-            if den_row is None:
-                continue
-            raw_x = row.get(x_field, "")
+        for den_row in den_rows:
+            key = str(den_row.get(join_field))
+            row = num_map.get(key) or {num_field: 0}
+            raw_x = den_row.get(x_field, "")
             try:
-                ratio = float(row[num_field]) / float(den_row[den_field]) * 100
+                ratio = float(row[num_field] or 0) / float(den_row[den_field]) * 100
                 ratio = round(ratio, 2)
             except (TypeError, ValueError, ZeroDivisionError):
                 ratio = 0
