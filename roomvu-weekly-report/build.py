@@ -336,7 +336,8 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
     if include_google:
         cover = sm.google_complete_through()
         a_date = datetime.date.fromisoformat(anchor)
-        partial = [wi for wi in spend_by_wi
+        shown = {int(_q_num(r.get("week_idx"))) for r in rev_rows if _q_num(r.get("week_idx")) is not None}
+        partial = [wi for wi in shown
                    if cover is not None and a_date + datetime.timedelta(days=wi * 7 + 6) > cover]
         for wi in partial:
             spend_by_wi[wi] = 0.0          # blank the row rather than show a false ROI
