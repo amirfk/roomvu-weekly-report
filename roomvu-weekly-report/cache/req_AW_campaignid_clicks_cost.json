@@ -157,5 +157,63 @@
 "Cost": 71.0591
 }
 ]
+},
+"df6961a08e9aef3e": {
+"fetched_at": "2026-09-30T18:35Z",
+"date_range_type": "custom",
+"start": "2026-09-23",
+"end": "2026-09-29",
+"rows": [
+{
+"Campaignid": "11179321084",
+"Clicks": 331,
+"Cost": 295.4568
+},
+{
+"Campaignid": "20853114375",
+"Clicks": 241,
+"Cost": 324.8498
+},
+{
+"Campaignid": "17809534029",
+"Clicks": 167,
+"Cost": 443.8649
+},
+{
+"Campaignid": "16587957261",
+"Clicks": 92,
+"Cost": 334.6732
+},
+{
+"Campaignid": "24280998477",
+"Clicks": 59,
+"Cost": 109.2262
+},
+{
+"Campaignid": "21379357856",
+"Clicks": 23,
+"Cost": 73.0714
+},
+{
+"Campaignid": "17948075953",
+"Clicks": 10,
+"Cost": 35.884
+},
+{
+"Campaignid": "20984261490",
+"Clicks": 7,
+"Cost": 40.8122
+},
+{
+"Campaignid": "22265795515",
+"Clicks": 0,
+"Cost": 0
+},
+{
+"Campaignid": "23705925967",
+"Clicks": 0,
+"Cost": 67.5995
+}
+]
 }
 }

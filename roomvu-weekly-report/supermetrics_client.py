@@ -179,8 +179,23 @@ def _resolve_range(date_range_type, start_date, end_date):
     return "1900-01-01", today.isoformat()
 
 
+def google_complete_through():
+    """Last date whose Google spend is complete in the daily dataset (the
+    dataset's final day is the partial "today" of its fetch). None if no data."""
+    try:
+        ds = _ensure_google_daily(_clean(os.environ.get("GOOGLE_ADS_ACCOUNT_ID", "459-407-5026")))
+    except Exception:
+        return None
+    return datetime.date.fromisoformat(ds["end"]) - datetime.timedelta(days=1)
+
+
 def _google_from_daily(ds, fields, date_range_type, start_date, end_date):
     s, e = _resolve_range(date_range_type, start_date, end_date)
+    complete = (datetime.date.fromisoformat(ds["end"]) - datetime.timedelta(days=1)).isoformat()
+    if start_date and end_date and end_date > complete:
+        # A fixed window the data doesn't fully cover would silently under-report.
+        raise ValueError(f"Google spend only complete through {complete}; "
+                         f"requested {start_date}..{end_date} (quota exhausted? refresh cache/)")
     agg = {}
     for d, cid, cost in ds["rows"]:
         if d < s or d > e:

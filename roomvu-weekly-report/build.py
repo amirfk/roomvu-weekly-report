@@ -275,8 +275,8 @@ def _google_spend_by_cohort(anchor_str, exclude_ids=None, include_ids=None):
     exclude = {str(c) for c in (exclude_ids or [])}
     include = {str(c) for c in (include_ids or [])}
     fields = ["Date", "Campaignid", "Cost"] if (exclude or include) else ["Date", "Cost"]
-    today = datetime.date.today()
-    rows = sm.fetch_google_ads(fields, start_date=a.isoformat(), end_date=today.isoformat())
+    cover = sm.google_complete_through() or datetime.date.today()
+    rows = sm.fetch_google_ads(fields, start_date=a.isoformat(), end_date=cover.isoformat())
     last = max((str(r.get("Date", ""))[:10] for r in rows), default="n/a")
     print(f"         google spend: {len(rows)} daily rows from {a} (latest date {last})")
     out = {}
@@ -332,6 +332,18 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
 
     label_fn = ((lambda wi: _cohort_label_long(anchor, wi))
                 if slide_cfg.get("week_label_style") == "long" else None)
+    note = slide_cfg.get("note")
+    if include_google:
+        cover = sm.google_complete_through()
+        a_date = datetime.date.fromisoformat(anchor)
+        partial = [wi for wi in spend_by_wi
+                   if cover is not None and a_date + datetime.timedelta(days=wi * 7 + 6) > cover]
+        for wi in partial:
+            spend_by_wi[wi] = 0.0          # blank the row rather than show a false ROI
+        if partial:
+            msg = f"Google spend not yet available after {cover.day} {cover:%b}; affected week(s) left blank."
+            print(f"  [WARN] '{title}' - {msg}")
+            note = f"{msg} {note or ''}".strip()
     week_cols, parsed = _cohort_ratio_rows(rev_rows, spend_by_wi, anchor,
                                            max_weeks=slide_cfg.get("max_weeks"), label_fn=label_fn)
     for r in rev_rows:
@@ -343,7 +355,7 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
               f"W1 ${_q_num(r.get('W1_rev')) or 0:,.0f}")
     print(f"  [OK]   '{title}' — {len(parsed)} cohort rows ({'Meta+Google' if include_google else 'Meta'} revenue/spend, live), cols: {week_cols}")
     return {"title": title, "render": "cohort_table", "skipped": False,
-            "week_cols": week_cols, "rows": parsed, "note": slide_cfg.get("note"),
+            "week_cols": week_cols, "rows": parsed, "note": note,
             "headers": slide_cfg.get("headers") or {}}
 
 
@@ -464,6 +476,8 @@ def build_branded_search_slide(slide_cfg, url_env, key_env, week_start, week_end
                 cost += float(r.get("Cost", 0) or 0)
     except Exception as exc:
         errors.append(f"supermetrics: {exc}")
+        clicks = cost = None                     # unknown, not zero
+        print(f"  [WARN] Branded Search clicks/cost unavailable: {str(exc)[:200]}")
 
     # Metabase: registrations attributed to the brand campaign, registered in-window.
     registrations = None
@@ -508,13 +522,13 @@ WHERE u.utm_source IN ('google', 'google-ads')
         errors.append(f"revenue: {exc}")
 
     cpa = None
-    if registrations:
+    if registrations and cost is not None:
         cpa = round(cost / registrations, 2)
 
     kpis = [
-        {"label": "Clicks",        "value": _fmt_number(clicks)},
+        {"label": "Clicks",        "value": _fmt_number(clicks) if clicks is not None else "—"},
         {"label": "Registrations", "value": _fmt_number(registrations)},
-        {"label": "Cost",          "value": _fmt_currency(cost)},
+        {"label": "Cost",          "value": _fmt_currency(cost) if cost is not None else "—"},
         {"label": "CPA",           "value": _fmt_currency(cpa)},
         {"label": "Im. Revenue",   "value": _fmt_currency(imm_revenue) if imm_revenue else "$-"},
         {"label": "Tot. Revenue",  "value": _fmt_currency(tot_revenue)},
@@ -784,9 +798,13 @@ def _fin_row_spend(row, ws, wi, url_env=None, key_env=None):
     if row.get("spend_google_campaigns"):
         ids = {str(c) for c in row["spend_google_campaigns"]}
         total = 0.0
-        for x in sm.fetch_google_ads(["Campaignid", "Cost"], start_date=ws, end_date=wi):
-            if str(x.get("Campaignid", "")) in ids:
-                total += float(x.get("Cost", 0) or 0)
+        try:
+            for x in sm.fetch_google_ads(["Campaignid", "Cost"], start_date=ws, end_date=wi):
+                if str(x.get("Campaignid", "")) in ids:
+                    total += float(x.get("Cost", 0) or 0)
+        except Exception as exc:                 # incomplete data -> gap, not a wrong number
+            print(f"  [WARN] Google spend unavailable for {ws}..{wi}: {str(exc)[:200]}")
+            return None
         return round(total, 2)
     if row.get("spend_linkedin"):
         try:
@@ -1247,6 +1265,13 @@ def _wed_week_window(spend_map, last_n=None):
     today = datetime.date.today()
     current = today - datetime.timedelta(days=(today - _GOOGLE_WED_ANCHOR).days % 7)
     weeks = sorted(w for w, sp in spend_map.items() if sp > 0 and w < current)
+    cover = sm.google_complete_through()
+    if cover is not None:
+        dropped = [w for w in weeks if w + datetime.timedelta(days=6) > cover]
+        if dropped:
+            print(f"  [WARN] Google data complete only through {cover}; "
+                  f"omitting partial week(s) {[str(w) for w in dropped]}")
+        weeks = [w for w in weeks if w + datetime.timedelta(days=6) <= cover]
     if last_n:
         weeks = weeks[-int(last_n):]
     return weeks
