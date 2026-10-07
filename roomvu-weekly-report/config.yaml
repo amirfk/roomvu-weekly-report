@@ -5,6 +5,34 @@ supermetrics_api_key_env: SUPERMETRICS_API_KEY
 google_ads_account_id: "4594075026"
 linkedin_ads_account_id: "508540143"
 
+# Meta spend fallback: ad_analytics (db 74) stopped loading after 30 Sep 2026.
+# When it has no data for yesterday, each Meta spend question below is
+# recomputed from Supermetrics Facebook Ads for the weeks it doesn't cover.
+# Campaign lists mirror each question's SQL exactly.
+meta_spend_fallback:
+  enabled: true
+  accounts: ["act_411150471670134", "act_1106920697984482"]   # Roomview Tech (CAD), VU USD
+  usd_rate: 1.39
+  questions:
+    8331: {mode: report_week, field: Spend, campaigns: ["120218175521230626", "120227402303430626", "120233992944810603"]}     # Insurance KPI
+    8336: {mode: report_week, field: Spend, campaigns: ["120221486897610626", "120228300262780626", "120236599108480603", "120236934764070603", "120247201100520626", "120250806358890603"]}     # Financial KPI
+    8335: {mode: report_week, field: Spend, campaigns: ["120231753483890603"]}   # Realtor KPI
+    8333: {mode: report_week, field: Spend, campaigns: ["120233281815980603"]}   # MB KPI
+    8338: {mode: weekly, anchor: "2025-08-06", field: amount_spent, round: 0, campaigns: ["120231753483890603", "120233281815980603"]}
+    8342: {mode: weekly, anchor: "2025-08-06", field: spend, round: 2, campaigns: ["120231753483890603", "120233281815980603"]}
+    8344: {mode: weekly, anchor: "2025-04-16", field: amount_spent, round: 0, campaigns: ["120218175521230626", "120227402303430626", "120233992944810603"]}
+  region:                      # card 8346's ad-set -> region mapping
+    campaign: "120231753483890603"
+    exclude_adsets: ["120237890415710603"]    # Vancouver
+    adsets:
+      "120233341704010603": Florida
+      "120233379581620603": All
+      "120249589587950603": All
+      "120233414684750603": East Coast
+      "120233414823840603": California
+      "120234497794270603": ON BC
+      "120235036284150603": Texas
+
 deck:
   title: "Roomvu — Weekly ROI Cohort Report"
   shade_scale: [0, 150]        # % clamp range for cell color

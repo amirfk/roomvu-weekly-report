@@ -233,6 +233,46 @@ def fetch_google_ads(fields, date_range_type="last_year_inc",
     return fetch("AW", account, fields, date_range_type, start_date, end_date, settings)
 
 
+# ── Facebook Ads daily dataset (fallback when ad_analytics stops loading) ────
+META_DAILY = CACHE_DIR / "meta_daily_adset.json"
+_META_FIELDS = ["Date", "adcampaign_id", "adset_id", "currency", "cost"]
+_meta_daily = None
+
+
+def ensure_meta_daily(accounts, start):
+    """Daily Facebook Ads spend by campaign x ad set, refreshed incrementally per
+    build and committed to cache/ so a refused API call still has data.
+    Returns {"start","end","fetched_at","rows":[[date, campaign, adset, currency, cost]]}."""
+    global _meta_daily
+    if _meta_daily is not None:
+        return _meta_daily
+    ds = json.loads(META_DAILY.read_text(encoding="utf-8")) if META_DAILY.exists() else None
+    today = datetime.date.today()
+    if ds and ds.get("rows") and ds["start"] <= start:
+        fetch_from = (datetime.date.fromisoformat(ds["end"]) - datetime.timedelta(days=3)).isoformat()
+    else:
+        fetch_from = start
+    try:
+        new = []
+        for acct in accounts:
+            for r in _api_call("FA", acct, _META_FIELDS, "custom", fetch_from, today.isoformat(), None):
+                new.append([str(r["Date"])[:10], str(r["adcampaign_id"]), str(r["adset_id"]),
+                            str(r.get("currency") or ""), float(r.get("cost") or 0)])
+        old = [r for r in (ds or {}).get("rows", []) if r[0] < fetch_from]
+        ds = {"start": min((ds or {}).get("start") or fetch_from, fetch_from), "end": today.isoformat(),
+              "fetched_at": _now(), "rows": old + new}
+        CACHE_DIR.mkdir(exist_ok=True)
+        META_DAILY.write_text(json.dumps(ds, separators=(",", ":")), encoding="utf-8")
+        print(f"  [INFO] Facebook Ads daily dataset refreshed: {len(new)} rows from {fetch_from} ({ds['start']}..{ds['end']})")
+    except Exception as exc:
+        if not ds:
+            raise
+        print(f"  [WARN] Supermetrics Facebook refresh failed ({str(exc)[:70]}...) "
+              f"- using cached dataset through {ds['end']} (fetched {ds.get('fetched_at')})")
+    _meta_daily = ds
+    return ds
+
+
 def fetch_linkedin_ads(fields, date_range_type="last_year_inc",
                        start_date=None, end_date=None, settings=None):
     account_id = os.environ.get("LINKEDIN_ADS_ACCOUNT_ID", "508540143")

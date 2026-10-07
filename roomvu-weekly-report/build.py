@@ -6,10 +6,121 @@ import yaml
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-from metabase_client import fetch_question, execute_sql, fetch_card_sql
+from metabase_client import fetch_question as _raw_fetch_question, execute_sql, fetch_card_sql
 import supermetrics_client as sm
 
 ROOT = Path(__file__).parent
+
+
+# ── Meta spend fallback ──────────────────────────────────────────────────────
+# Every Meta spend figure in the deck comes from ad_analytics (db 74). When that
+# table stops loading, spend for the missing days is taken from Supermetrics
+# Facebook Ads instead (same two ad accounts; USD x1.39 exactly like the
+# questions' `if(account_name='facebook', spend, spend*1.39)`). Activated only
+# when ad_analytics has no data for yesterday.
+_META_FB = {"active": False}
+
+
+def _init_meta_fallback(cfg, url_env, key_env, report_ws, report_we):
+    fb = cfg.get("meta_spend_fallback") or {}
+    if not fb or not fb.get("enabled", True):
+        return
+    today = datetime.date.today()
+    try:
+        mx = execute_sql("select max(date) as mx from ad_analytics", 74, url_env, key_env)[0]["mx"]
+        aa_last = datetime.date.fromisoformat(str(mx)[:10])
+    except Exception as exc:
+        print(f"  [WARN] could not check ad_analytics freshness: {exc}")
+        return
+    if aa_last >= today - datetime.timedelta(days=1):
+        print(f"  [INFO] ad_analytics current through {aa_last}; Meta spend from Metabase")
+        return
+    aa_complete = aa_last - datetime.timedelta(days=1)      # its last day is partial
+    start = (aa_complete - datetime.timedelta(days=13)).isoformat()
+    try:
+        ds = sm.ensure_meta_daily(fb["accounts"], start)
+    except Exception as exc:
+        print(f"  [WARN] ad_analytics stale since {aa_last} and Supermetrics Facebook unavailable: {exc}")
+        return
+    usd = float(fb.get("usd_rate", 1.39))
+    rows = [(d, c, a, cost * (1.0 if cur.upper() == "CAD" else usd)) for d, c, a, cur, cost in ds["rows"]]
+    _META_FB.update(active=True, aa_complete=aa_complete,
+                    fa_complete=datetime.date.fromisoformat(ds["end"]) - datetime.timedelta(days=1),
+                    rows=rows, questions={int(k): v for k, v in (fb.get("questions") or {}).items()},
+                    region=fb.get("region") or {}, report_ws=report_ws, report_we=report_we)
+    print(f"  [WARN] ad_analytics Meta spend stops at {aa_last} (partial); using Supermetrics "
+          f"Facebook Ads for every week after {aa_complete} (data through {_META_FB['fa_complete']})")
+
+
+def _fa_spend(start, end, campaigns=None, exclude=None, adsets=None):
+    """CAD Facebook spend over [start, end] inclusive from the Supermetrics
+    dataset, or None if the dataset doesn't cover the window."""
+    if not _META_FB.get("active") or end > _META_FB["fa_complete"]:
+        return None
+    s, e = start.isoformat(), end.isoformat()
+    inc = {str(c) for c in campaigns} if campaigns else None
+    exc = {str(c) for c in exclude} if exclude else set()
+    total = 0.0
+    for d, c, a, cad in _META_FB["rows"]:
+        if s <= d <= e and (inc is None or c in inc) and c not in exc and (adsets is None or a in adsets):
+            total += cad
+    return total
+
+
+def _meta_needs_fa(window_end):
+    return _META_FB.get("active") and window_end > _META_FB["aa_complete"]
+
+
+def _meta_patch_weekly(anchor, rows, field, rnd, campaigns=None, exclude=None, label=True):
+    """Replace weekly spend rows (week_idx relative to a Wednesday anchor) for
+    every complete week ad_analytics doesn't fully cover; adds missing weeks."""
+    if not _META_FB.get("active"):
+        return rows
+    a = datetime.date.fromisoformat(anchor)
+    today = datetime.date.today()
+    out = [dict(r) for r in rows]
+    by_wi = {int(_q_num(r.get("week_idx"))): r for r in out if _q_num(r.get("week_idx")) is not None}
+    wi = (_META_FB["aa_complete"] + datetime.timedelta(days=1) - a).days // 7
+    while a + datetime.timedelta(days=7 * wi + 7) <= today:        # questions' "+7 <= curdate()"
+        ws = a + datetime.timedelta(days=7 * wi)
+        we = ws + datetime.timedelta(days=6)
+        v = _fa_spend(ws, we, campaigns, exclude)
+        if v is None:
+            break
+        r = by_wi.get(wi)
+        if r is None:
+            r = {"week_idx": wi}
+            if label:
+                r["week"] = f"{ws.day} {ws:%b} - {we.day} {we:%b}"
+            out.append(r)
+        r[field] = round(v, rnd)
+        wi += 1
+    out.sort(key=lambda r: _q_num(r.get("week_idx")) or 0)
+    return out
+
+
+def fetch_question(qid, url_env, key_env, parameters=None):
+    """fetch_question with Meta spend questions patched from Supermetrics when
+    ad_analytics is stale (see _init_meta_fallback)."""
+    rows = _raw_fetch_question(qid, url_env, key_env, parameters)
+    spec = _META_FB.get("questions", {}).get(int(qid)) if _META_FB.get("active") else None
+    if not spec:
+        return rows
+    field, rnd = spec["field"], int(spec.get("round", 2))
+    if spec["mode"] == "report_week":
+        ws, we = _META_FB["report_ws"], _META_FB["report_we"]
+        if not _meta_needs_fa(we):
+            return rows
+        v = _fa_spend(ws, we, spec["campaigns"])
+        if v is None:
+            return rows
+        old = _q_num(_first_row(rows).get(field)) if rows else None
+        print(f"         Q{qid} {field}: ad_analytics {old} -> Supermetrics {v:,.2f} ({ws}..{we})")
+        return [{field: round(v, rnd)}]
+    patched = _meta_patch_weekly(spec["anchor"], rows, field, rnd, spec["campaigns"])
+    if patched and rows:
+        print(f"         Q{qid} {field}: latest week {patched[-1].get('week')} = {patched[-1].get(field)} (Supermetrics)")
+    return patched
 OUTPUT = ROOT.parent / "index.html"  # served from repo root by GitHub Pages
 
 
@@ -325,6 +436,10 @@ def build_cohort_combined_slide(slide_cfg, url_env, key_env):
         wi = _q_num(r.get("week_idx"))
         if wi is not None:
             meta_spend[int(wi)] = _q_num(r.get("Amount_Spent")) or 0.0
+    if _META_FB.get("active"):
+        for r in _meta_patch_weekly(anchor, [{"week_idx": k, "Amount_Spent": v} for k, v in meta_spend.items()],
+                                    "Amount_Spent", 2, meta_ids or None, meta_excl or None, label=False):
+            meta_spend[int(r["week_idx"])] = r["Amount_Spent"]
 
     spend_by_wi = {}
     for wi in set(meta_spend) | set(google_spend):
@@ -984,8 +1099,26 @@ def build_region_table_slide(slide_cfg, url_env, key_env, week_start, week_end):
         sql = sql.replace("{{start_date}}", f"'{start}'").replace("{{end_date}}", f"'{end}'")
         return execute_sql(sql, int(db), url_env, key_env)
 
+    def fa_region_spend(start, end):
+        """Region spend from Supermetrics (same ad-set mapping as card 8346)."""
+        reg = _META_FB.get("region") or {}
+        s = datetime.date.fromisoformat(start)
+        e = datetime.date.fromisoformat(end) - datetime.timedelta(days=1)
+        if not reg or not _meta_needs_fa(e) or e > _META_FB["fa_complete"]:
+            return None
+        amap = {str(k): v for k, v in (reg.get("adsets") or {}).items()}
+        skip = {str(x) for x in reg.get("exclude_adsets", [])}
+        camp = str(reg["campaign"])
+        out = {}
+        for d, c, a, cad in _META_FB["rows"]:
+            if c == camp and a not in skip and s.isoformat() <= d <= e.isoformat():
+                region = amap.get(a, "Other")
+                out[region] = out.get(region, 0.0) + cad
+        print(f"         regions {start}..{e}: spend from Supermetrics {{{', '.join(f'{k}: {v:,.0f}' for k, v in sorted(out.items()))}}}")
+        return [{"region": k, "Spend": round(v)} for k, v in sorted(out.items())]
+
     def fetch_week(start, end):
-        spend_rows = run_card(qid_spend, start, end)
+        spend_rows = fa_region_spend(start, end) or run_card(qid_spend, start, end)
         reg_rows   = run_card(qid_reg,   start, end)
         print(f"    spend cols: {list(spend_rows[0].keys()) if spend_rows else '[]'}")
         print(f"    reg cols:   {list(reg_rows[0].keys())  if reg_rows  else '[]'}")
@@ -1576,6 +1709,7 @@ def build():
     days_since_tuesday = (today.weekday() - 1) % 7
     week_end = today - datetime.timedelta(days=days_since_tuesday)
     week_start = week_end - datetime.timedelta(days=6)
+    _init_meta_fallback(cfg, url_env, key_env, week_start, week_end)
 
     slides_data = []
     for slide_cfg in cfg["slides"]:
