@@ -217,7 +217,7 @@
 ]
 },
 "d169e1c3eafed8cc": {
-"fetched_at": "2026-10-07T17:21Z",
+"fetched_at": "2026-10-08T12:33Z",
 "date_range_type": "last_year_inc",
 "start": "2026-09-30",
 "end": "2026-10-06",
@@ -229,7 +229,7 @@
 },
 {
 "Campaignid": "20853114375",
-"Clicks": 174,
+"Clicks": 175,
 "Cost": 233.2328
 },
 {
@@ -260,7 +260,7 @@
 {
 "Campaignid": "20984261490",
 "Clicks": 5,
-"Cost": 42.1205
+"Cost": 41.9522
 },
 {
 "Campaignid": "22265795515",
