@@ -1695,6 +1695,18 @@ def build():
     cfg = load_config()
     url_env = cfg["metabase_url_env"]
     key_env = cfg["metabase_api_key_env"]
+    os.environ.setdefault("GOOGLE_ADS_ACCOUNT_ID", str(cfg.get("google_ads_account_id", "")))
+    os.environ.setdefault("LINKEDIN_ADS_ACCOUNT_ID", str(cfg.get("linkedin_ads_account_id", "")))
+
+    # The weekly "Ads Report" deck (report.yaml) replaced the legacy slide list
+    # below; the legacy path is kept only for reference.
+    report_cfg = ROOT / "report.yaml"
+    if report_cfg.exists():
+        import ads_report
+        rcfg = yaml.safe_load(report_cfg.read_text(encoding="utf-8"))
+        env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=True)
+        ads_report.run(rcfg, url_env, key_env, env, OUTPUT)
+        return
     fixed_cols = cfg["fixed_columns"]
 
     # Pass account IDs to env so supermetrics_client picks them up

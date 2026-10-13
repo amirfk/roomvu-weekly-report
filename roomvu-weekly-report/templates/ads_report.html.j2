@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{{ deck_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Arimo:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  :root {
+    --band: #e9edee; --navy: #073763; --navy2: #1f3864; --teal: #1a9988; --orange: #eb5600;
+    --text: #595959; --ink: #1a1a1a; --green: #274e13;
+    --lato: 'Lato', 'Helvetica Neue', Arial, sans-serif;
+    --arial: Arial, 'Arimo', 'Helvetica Neue', sans-serif;
+  }
+  .reveal-viewport { background: #fff; }
+  .reveal { font-family: var(--lato); color: var(--ink); }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { padding: 0 !important; width: 1280px; height: 720px; }
+  .s { position: absolute; inset: 0; background: #fff; overflow: hidden; }
+
+  /* header band + title (content slides) */
+  .band { position: absolute; left: 0; right: 0; top: 0; height: 68px; background: var(--band); }
+  .icon { position: absolute; left: 66px; top: 73px; width: 87px; height: 87px; border-radius: 6px; object-fit: cover; }
+  .icon.small { left: 130px; top: 75px; width: 80px; height: 80px; }
+  .ttl { position: absolute; left: 182px; top: 92px; right: 40px; margin: 0;
+         font: 700 41.6px/1.15 var(--lato); color: var(--navy); white-space: nowrap; }
+  .ttl.noicon { left: 126px; }
+  .ttl.google { left: 262px; }
+  .bar { position: absolute; left: 128px; top: 166px; width: 108px; height: 6px;
+         background: linear-gradient(90deg, var(--teal) 0 50%, var(--orange) 50% 100%); }
+  .bar.google { left: 128px; }
+  .body { position: absolute; left: 0; right: 0; top: 190px; bottom: 0; }
+
+  /* title / thanks / section */
+  .photo { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .tbox { position: absolute; left: 20px; padding: 0 22px; border: 2px solid #cfd2d4; border-radius: 4px;
+          background: linear-gradient(180deg, #ffffff 0%, #d9dcde 100%);
+          font: 700 64px/1.35 var(--lato); color: var(--green); }
+  .tbox.date { font-size: 30px; line-height: 1.7; }
+  .thanks { position: absolute; left: 50%; top: 190px; transform: translateX(-50%); padding: 4px 28px;
+            border: 2px solid #9a9d9f; border-radius: 14px; background: linear-gradient(180deg,#fff,#d9dcde);
+            font: 700 64px/1.3 var(--lato); color: var(--green); white-space: nowrap; }
+  .section { position: absolute; inset: 0; background: var(--band); }
+  .section .white { position: absolute; left: 0; right: 0; top: 0; height: 76px; background: #fff; }
+  .section .bar { top: 182px; }
+  .section h1 { position: absolute; left: 126px; top: 212px; margin: 0; font: 700 74.7px/1.1 var(--lato); color: var(--ink); }
+
+  /* KPI text (Lato 17pt grey) */
+  .kpis { position: absolute; left: 136px; top: 60px; font: 400 30.6px/1 var(--lato); color: var(--text); }
+  .kpis p { margin: 0 0 40px; white-space: nowrap; }
+  .kpis.compact p { margin-bottom: 30px; }
+  .creative { position: absolute; right: 70px; top: -40px; max-height: 560px; max-width: 330px;
+              box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .creative.wide { right: 60px; top: 30px; max-width: 770px; max-height: 280px; box-shadow: none; }
+  .side-text { position: absolute; left: 505px; top: -100px; width: 730px; font: 400 21px/1.35 var(--lato); color: var(--ink); }
+  .side-text p:nth-child(2) { width: 370px; margin-top: 30px; }
+  .side-text p { margin: 0 0 28px; }
+  .note { position: absolute; left: 60px; right: 60px; bottom: 18px; font: 400 15px/1.35 var(--lato); color: #8a8f93; }
+
+  /* charts */
+  .chart { position: absolute; }
+  .chart .ct { position: absolute; left: 0; right: 0; top: 0; text-align: center;
+               font: 700 25px/1 var(--arial); color: #757575; }
+  .chart .cw { position: absolute; left: 0; right: 0; top: 40px; bottom: 0; }
+  .chart.notitle .cw { top: 0; }
+
+  /* tables */
+  table { border-collapse: collapse; }
+  .reveal table td, .reveal table th { vertical-align: middle; }
+  .ptitle { position: absolute; left: 48px; top: 14px; margin: 0; font: 700 31px/1.2 var(--lato); color: var(--navy); }
+  .ptitle.arial { left: 64px; top: 44px; font: 700 39px/1.2 var(--arial); color: var(--navy2); }
+  .gtable { font: 400 21.3px/1.2 var(--arial); color: #000; }
+  .gtable th, .gtable td { border: 1px solid #d0d0d0; padding: 0 12px; height: 62px; text-align: center; }
+  .gtable thead th { background: #bdbdbd; font-weight: 700; }
+  .gtable tbody tr:nth-child(even) td { background: #f3f3f3; }
+  .navy-t { font: 400 15px/1.2 'Inter', var(--arial); width: 1236px; margin-left: 22px; }
+  .navy-t th { background: #021649; color: #fff; font-weight: 600; padding: 9px 12px; text-align: center; font-size: 14px; }
+  .navy-t th:first-child, .navy-t td:first-child { text-align: left; }
+  .navy-t td { padding: 7px 12px; border-bottom: 1px solid #e6e8eb; text-align: center; height: 32px; }
+  .navy-t tr:nth-child(even) td { background: #f8f9fa; }
+  .navy-t td.cell { font-weight: 700; font-size: 13px; border-radius: 4px; }
+  .reg8 { font: 400 18.5px/1.1 var(--arial); color: #000; }
+  .reg8 th, .reg8 td { border: 1px solid #c8c8c8; padding: 1px 8px; height: 31px; }
+  .reg8 th { font-weight: 700; text-align: left; }
+  .reg8 td { text-align: right; }
+  .reg8 td:first-child { text-align: left; }
+  .reg8 td.l { text-align: left; }
+  .rh { font: 700 22px/1 var(--lato); color: #999; margin: 8px 0 6px; }
+  .reg9 { font: 400 19.5px/1.2 var(--arial); color: #262626; width: 1170px; }
+  .reg9 th { background: var(--navy2); color: #fff; font-weight: 700; height: 53px; border: 1px solid #fff; padding: 0 14px; }
+  .reg9 th:first-child, .reg9 td:first-child { text-align: left; }
+  .reg9 td { height: 51px; text-align: center; border: 1px solid #c9d3e5; padding: 0 14px; }
+  .reg9 tr:nth-child(even) td { background: #dae3f3; }
+  .reg9 tr.total td { background: #b4c7e7; color: var(--navy2); font-weight: 700; }
+  .fin { font: 700 24.9px/1.2 var(--lato); color: #000; }
+  .fin th { background: var(--navy); color: #fff; padding: 6px 10px; border: 1px solid #9e9e9e; }
+  .fin td { border: 1px solid #9e9e9e; text-align: center; padding: 0 10px; height: 54px; }
+  .fin th { text-align: center; height: 66px; }
+  .fin .small { display: block; font-size: 14px; }
+  .rt { font: 400 24px/1.2 var(--lato); color: var(--text); }
+  .rt th { text-align: left; font-weight: 700; color: var(--navy); padding: 6px 26px 10px 0; border-bottom: 2px solid #ddd; }
+  .rt td { padding: 12px 26px 12px 0; border-bottom: 1px solid #eee; }
+  .err { position: absolute; left: 126px; top: 40px; right: 126px; padding: 20px; background: #fff4f4;
+         border: 1px solid #f1c2c2; color: #a33; font: 400 20px/1.4 var(--lato); }
+  #print-btn { position: fixed; top: 14px; right: 18px; z-index: 9999; background: var(--navy); color: #fff;
+               border: none; border-radius: 6px; padding: 7px 16px; font: 600 13px var(--lato); cursor: pointer; opacity: .85; }
+  @media print { #print-btn { display: none; } }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+{% macro header(s) -%}
+  {% if s.header == 'plain' %}<h2 class="ptitle">{{ s.title }}</h2>
+  {% elif s.header == 'plain_arial' %}<h2 class="ptitle arial">{{ s.title }}</h2>
+  {% else %}
+  <div class="band"></div>
+  {% if s.icon %}<img class="icon{{ ' small' if s.icon == 'google' else '' }}" src="{{ assets }}/icon_{{ s.icon }}.jpg" alt="" />{% endif %}
+  <h2 class="ttl{{ '' if s.icon else ' noicon' }}{{ ' google' if s.icon == 'google' else '' }}">{{ s.title }}</h2>
+  <div class="bar"></div>
+  {% endif %}
+{%- endmacro %}
+{% macro chartbox(c, id, style) -%}
+  <div class="chart{{ '' if c.title else ' notitle' }}" style="{{ style }}">
+    {% if c.title %}<div class="ct">{{ c.title }}</div>{% endif %}
+    <div class="cw"><canvas id="{{ id }}"></canvas></div>
+  </div>
+  <script>window.__charts = window.__charts || []; window.__charts.push({id: {{ id | tojson }}, c: {{ c | tojson }}});</script>
+{%- endmacro %}
+
+{% for s in slides %}
+<section>
+{% if s.type == 'title' %}
+  <div class="s">
+    <div class="photo" style="background-image:url('{{ assets }}/bg_title.jpg')"></div>
+    <div class="tbox" style="top:18px">Ads Report</div>
+    <div class="tbox date" style="top:150px">{{ date_label }}</div>
+  </div>
+{% elif s.type == 'thanks' %}
+  <div class="s">
+    <div class="photo" style="background-image:url('{{ assets }}/bg_thanks.jpg'); background-position: left 30%"></div>
+    <div class="thanks">Thank you!</div>
+  </div>
+{% elif s.type == 'section' %}
+  <div class="s section"><div class="white"></div><div class="bar"></div><h1>{{ s.title }}</h1></div>
+{% else %}
+  <div class="s">
+    {{ header(s) }}
+    <div class="body">
+    {% if s.type == 'error' %}
+      <div class="err">This slide could not be built: {{ s.error }}</div>
+
+    {% elif s.type == 'charts' %}
+      {% set n = s.charts | length %}
+      {% if s.layout == 'triple' %}
+        {{ chartbox(s.charts[0], 'c' ~ loop.index ~ '_0', 'left:30px; top:20px; width:650px; height:440px') }}
+        {{ chartbox(s.charts[1], 'c' ~ loop.index ~ '_1', 'left:720px; top:-120px; width:540px; height:300px') }}
+        {{ chartbox(s.charts[2], 'c' ~ loop.index ~ '_2', 'left:720px; top:195px; width:540px; height:300px') }}
+      {% elif n == 1 %}
+        {{ chartbox(s.charts[0], 'c' ~ loop.index ~ '_0', 'left:218px; top:-12px; width:846px; height:520px') }}
+      {% else %}
+        {{ chartbox(s.charts[0], 'c' ~ loop.index ~ '_0', 'left:16px; top:0px; width:620px; height:400px') }}
+        {{ chartbox(s.charts[1], 'c' ~ loop.index ~ '_1', 'left:650px; top:0px; width:610px; height:400px') }}
+      {% endif %}
+      {% if s.note %}<div class="note">{{ s.note }}</div>{% endif %}
+
+    {% elif s.type == 'kpi_chart' %}
+      <div class="kpis" style="top:120px">{% for k in s.kpis %}<p>{{ k.label }}: {{ k.value }}</p>{% endfor %}</div>
+      {{ chartbox(s.chart, 'c' ~ loop.index ~ '_0', 'left:590px; top:-10px; width:670px; height:420px') }}
+
+    {% elif s.type == 'kpi' %}
+      <div class="kpis{{ ' compact' if s.kpis | length > 5 else '' }}" style="top:{{ 70 if s.kpis | length > 5 else 90 }}px">
+        {% for k in s.kpis %}<p>{{ k.label }}: {{ k.value }}</p>{% endfor %}
+      </div>
+      {% if s.side_text %}<div class="side-text">{% for t in s.side_text %}<p>{{ t }}</p>{% endfor %}</div>{% endif %}
+      {% if s.creative %}<img class="creative{{ ' wide' if s.creative_wide else '' }}" src="{{ s.creative }}" alt=""
+           {% if s.side_text %}style="top:5px; max-height:500px; right:90px"{% endif %} />{% endif %}
+      {% if s.note %}<div class="note">{{ s.note }}</div>{% endif %}
+
+    {% elif s.type == 'retargeting' %}
+      <div style="position:absolute; left:126px; top:40px">
+        {% if s.rows %}
+        <table class="rt"><thead><tr><th>Campaign</th><th>Spend</th><th>Link clicks</th><th>CPC</th></tr></thead>
+          <tbody>{% for r in s.rows %}<tr><td>{{ r.campaign }}</td><td>{{ r.spend }}</td><td>{{ r.clicks }}</td><td>{{ r.cpc }}</td></tr>{% endfor %}</tbody></table>
+        {% else %}<p class="rt">No retargeting spend this week.</p>{% endif %}
+      </div>
+      {% if s.creative %}<img class="creative" src="{{ s.creative }}" alt="" style="top:-70px; max-height:520px" />{% endif %}
+
+    {% elif s.type == 'cohort' and s.style == 'gray' %}
+      <table class="gtable" style="position:absolute; left:10px; top:55px; width:1260px">
+        <thead><tr><th style="width:330px"></th><th>Registration</th><th>Amount Spent</th>{% for c in s.cols %}<th style="width:148px">{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for r in s.rows %}<tr><td>{{ r.week }}</td><td>{{ r.regs }}</td><td>{{ r.spend }}</td>{% for c in r.cells %}<td>{{ c.text }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table>
+
+    {% elif s.type == 'cohort' %}
+      <table class="navy-t" style="position:absolute; top:0">
+        <thead><tr><th style="width:230px">Week</th><th>Registrations</th><th>Amount Spent</th>{% for c in s.cols %}<th style="width:110px">{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for r in s.rows %}<tr><td>{{ r.week }}</td><td>{{ r.regs }}</td><td>{{ r.spend }}</td>
+          {% for c in r.cells %}{% if c.style %}<td class="cell" style="{{ c.style }}">{{ c.text }}</td>{% else %}<td></td>{% endif %}{% endfor %}</tr>{% endfor %}</tbody>
+      </table>
+
+    {% elif s.type == 'regions_compare' %}
+      <div style="position:absolute; left:48px; top:-118px">
+      {% for t in s.tables %}
+        {% if t.label %}<div class="rh">{{ t.label }}</div>{% endif %}
+        <table class="reg8" style="width:1176px">
+          <thead><tr><th>Targeting</th><th>Spend</th><th>Registrations</th><th>CPA</th><th>Subs.</th><th>Tot. subs</th><th>Imm Rev</th><th>Imm Rev Rate</th></tr></thead>
+          <tbody>{% for r in t.rows %}<tr><td>{{ r.region }}</td><td>{{ r.spend }}</td><td>{{ r.regs }}</td><td>{{ r.cpa }}</td><td>{{ r.paid }}</td><td>{{ r.tot_subs }}</td>
+            <td{% if r.imm == '-' %} class="l"{% endif %}>{{ r.imm }}</td><td{% if r.rate == '-' %} class="l"{% endif %}>{{ r.rate }}</td></tr>{% endfor %}</tbody>
+        </table>
+      {% endfor %}
+      </div>
+
+    {% elif s.type == 'regions_summary' %}
+      <table class="reg9" style="position:absolute; left:64px; top:-30px">
+        <thead><tr><th>Region</th><th>Spend</th><th>Regs</th><th>CPA</th><th>Book Demo</th><th>Paid</th><th>Imm Rev</th><th>ROAS</th></tr></thead>
+        <tbody>{% for r in s.rows %}<tr><td>{{ r.region }}</td><td>{{ r.spend }}</td><td>{{ r.regs }}</td><td>{{ r.cpa }}</td><td>{{ r.demo }}</td><td>{{ r.paid }}</td><td>{{ r.imm }}</td><td>{{ r.roas }}</td></tr>{% endfor %}
+          <tr class="total"><td>Total</td><td>{{ s.total.spend }}</td><td>{{ s.total.regs }}</td><td>{{ s.total.cpa }}</td><td>{{ s.total.demo }}</td><td>{{ s.total.paid }}</td><td>{{ s.total.imm }}</td><td>{{ s.total.roas }}</td></tr></tbody>
+      </table>
+
+    {% elif s.type == 'fin_re' %}
+      <table class="fin" style="position:absolute; left:80px; top:12px; width:1176px">
+        <thead><tr><th style="width:180px">Goal</th><th style="width:176px">Channel</th><th>Amount<br/>Spent</th><th>Total<br/>Spend</th><th>Total<br/>Revenue</th><th>Imm<br/>Return</th><th>#Registration</th><th>Total Reg.</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4">Acquisition</td><td>Facebook</td><td>{{ s.r.fb.spend }}</td>
+              <td rowspan="7">{{ s.total_spend }}</td><td rowspan="7">{{ s.revenue }}</td><td rowspan="7">{{ s.imm_return }}</td>
+              <td>{{ s.r.fb.reg }}</td><td rowspan="5">{{ s.total_reg }}</td></tr>
+          <tr><td>Google</td><td>{{ s.r.google.spend }}</td><td>{{ s.r.google.reg }}</td></tr>
+          <tr><td>Retargeting</td><td>{{ s.r.rt.spend }}</td><td>-</td></tr>
+          <tr><td>LinkedIn</td><td>{{ s.r.li.spend }}</td><td>{{ s.r.li.reg }}</td></tr>
+          <tr><td colspan="2">Tests<span class="small">[Open AI+FB+Dem Gen]</span></td><td>{{ s.r.tests.spend }}</td><td>{{ s.r.tests.reg }}</td></tr>
+          <tr><td rowspan="2">Awareness</td><td>Facebook</td><td>{{ s.r.aw_fb.spend }}</td><td rowspan="2" colspan="2">N/A</td></tr>
+          <tr><td>Google</td><td>{{ s.r.aw_g.spend }}</td></tr>
+        </tbody>
+      </table>
+
+    {% elif s.type == 'fin_ins' %}
+      <table class="fin" style="position:absolute; left:102px; top:120px; width:1270px; max-width:1156px; font-size:24px">
+        <thead><tr><th style="width:200px">Goal</th><th style="width:200px">Channel</th><th>Amount<br/>Spent</th><th>Total<br/>Revenue</th><th>Imm<br/>Return</th><th>#Registration</th><th>Total Reg.</th></tr></thead>
+        <tbody>{% for r in s.rows %}<tr>{% if loop.first %}<td rowspan="{{ s.rows | length }}">Acquisition</td>{% endif %}
+          <td style="font-size:18px">{{ r.channel }}</td><td>{{ r.spend }}</td><td>{{ r.revenue }}</td><td>{{ r.imm_return }}</td><td>{{ r.reg }}</td>
+          {% if loop.first %}<td rowspan="{{ s.rows | length }}">{{ s.total_reg }}</td>{% endif %}</tr>{% endfor %}</tbody>
+      </table>
+    {% endif %}
+    </div>
+  </div>
+{% endif %}
+</section>
+{% endfor %}
+</div></div>
+
+<button id="print-btn" onclick="window.location.href=window.location.pathname+'?print-pdf#/'">⬇ Export PDF</button>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Chart.register(ChartDataLabels);
+  function fmt(v, f, d) {
+    if (v === null || v === undefined) return '';
+    if (f === 'currency') return '$' + v.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+    if (f === 'percent') return v.toFixed(d) + '%';
+    return Math.round(v).toLocaleString('en-US');
+  }
+  function axis(v, f) {
+    if (f === 'currency') return '$' + v.toLocaleString('en-US');
+    if (f === 'percent') return v.toFixed(2) + '%';
+    return v.toLocaleString('en-US');
+  }
+  (window.__charts || []).forEach(function (o) {
+    var c = o.c, many = c.series.length > 1;
+    new Chart(document.getElementById(o.id), {
+      type: 'line',
+      data: { labels: c.labels, datasets: c.series.map(function (s) {
+        return { label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color,
+                 pointBackgroundColor: s.color, pointRadius: 5, borderWidth: 4, tension: 0, spanGaps: true };
+      }) },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        layout: { padding: { top: 18, right: 26, left: 4 } },
+        plugins: {
+          legend: { display: many, position: 'top', labels: { usePointStyle: true, font: { size: 15, family: 'Arial' } } },
+          tooltip: { callbacks: { label: function (x) { return x.dataset.label + ': ' + fmt(x.parsed.y, c.format, c.decimals); } } },
+          datalabels: { align: 'top', anchor: 'end', offset: 2, clamp: true,
+                        color: function (x) { return x.dataset.borderColor; },
+                        font: { weight: 'bold', size: c.labels.length > 45 ? 11 : 13, family: 'Arial' },
+                        formatter: function (v) { return fmt(v, c.format, c.decimals); } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90, autoSkip: true,
+               maxTicksLimit: 24, font: { size: 15, weight: 'bold', family: 'Arial' }, color: '#000' } },
+          y: { beginAtZero: true, grid: { color: '#cccccc' }, border: { display: false },
+               ticks: { maxTicksLimit: 5, font: { size: 16, weight: 'bold', family: 'Arial' }, color: '#000',
+                        callback: function (v) { return axis(v, c.format); } } }
+        }
+      }
+    });
+  });
+  var isPrint = window.location.search.includes('print-pdf');
+  if (isPrint) document.getElementById('print-btn').style.display = 'none';
+  Reveal.initialize({ hash: true, center: false, margin: 0, width: 1280, height: 720,
+                      transition: 'none', pdfMaxPagesPerSlide: 1 });
+  if (isPrint) Reveal.addEventListener('ready', function () { setTimeout(function () { window.print(); }, 1500); });
+</script>
+</body>
+</html>
