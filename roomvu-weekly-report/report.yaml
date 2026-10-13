@@ -171,6 +171,7 @@ slides:
             series: [{label: "Immediate return rate", metric: imm_rate, segment: realtor}]}
 
   - type: regions
+    hidden: true                 # hidden in the team's deck
     style: compare            # this week + last week (manual slide "Meta - Regions based targeting")
     title: "Meta -  Regions based targeting"
     header: plain
@@ -187,7 +188,12 @@ slides:
     max_weeks: 4
     week_label_style: long
 
+  - type: image                 # the team's one-off analysis slide, copied as-is
+    title: "RV Retargeting: 50% Offer"
+    image: static_rv_retargeting_50_offer.png
+
   - type: retargeting
+    hidden: true                 # hidden in the team's deck
     title: "Meta - Retargeting"
     icon: meta
     creative: creative_retargeting.jpg
@@ -327,6 +333,7 @@ slides:
       - {label: "Tot. Revenue", metric: revenue, segment: google_brand}
 
   - type: kpi
+    hidden: true                 # hidden in the team's deck
     title: "Competitors"
     creative: creative_competitors.jpg
     side_text:

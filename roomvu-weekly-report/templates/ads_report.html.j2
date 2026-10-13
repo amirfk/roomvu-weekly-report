@@ -146,6 +146,8 @@
     <div class="photo" style="background-image:url('{{ assets }}/bg_thanks.jpg'); background-position: left 30%"></div>
     <div class="thanks">Thank you!</div>
   </div>
+{% elif s.type == 'image' %}
+  <div class="s"><img src="{{ s.image }}" alt="{{ s.title }}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain" /></div>
 {% elif s.type == 'section' %}
   <div class="s section"><div class="white"></div><div class="bar"></div><h1>{{ s.title }}</h1></div>
 {% else %}

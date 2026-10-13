@@ -408,6 +408,9 @@ group by 1""")
             out.append({"label": spec["label"], "value": txt})
         return out
 
+    def b_image(self, s):
+        return {"image": f"{ASSETS}/{s['image']}"}
+
     def b_charts(self, s):
         return {"type": "charts", "layout": s.get("layout", "auto"),
                 "charts": [self.chart(c) for c in s["charts"]], "note": s.get("note")}
