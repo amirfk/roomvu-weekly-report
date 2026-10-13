@@ -121,6 +121,7 @@ class Report:
         self._google = None
         self._user = {}
         self._names = None
+        self.fa_rows = []
         mi = ROOT / "manual_inputs.yaml"
         allm = (yaml.safe_load(mi.read_text(encoding="utf-8")) if mi.exists() else None) or {}
         self.manual = allm.get(self.ws.isoformat()) or allm.get(str(self.ws)) or {}
@@ -181,44 +182,49 @@ where aa.date >= '2025-04-02' group by 1, 2""", db=74)
             key = (int(_num(r["k"])), str(r["cid"]))
             spend[key] = _num(r["cad"]) or 0.0
             clicks[key] = _num(r["clicks"]) or 0.0
-        covered = {}                                     # k -> True if fully covered
-        k_first_gap = wk(aa_complete + dt.timedelta(days=1))
-        for k in range(k_first_gap, self.k + 1):
-            if wstart(k) + dt.timedelta(days=6) <= aa_complete:
-                continue
-            covered[k] = False
-        if covered:                                      # patch from Supermetrics FA
-            start = wstart(min(covered))
+        # Weeks to take from Supermetrics Facebook Ads (Facebook's own numbers):
+        #  * every week from meta_supermetrics_from on (ad_analytics kept phantom
+        #    rows from its 30 Sep 2026 outage that the backfill never corrected), and
+        #  * any week ad_analytics hasn't fully loaded.
+        gap = {k for k in range(wk(aa_complete + dt.timedelta(days=1)), self.k + 1)
+               if wstart(k) + dt.timedelta(days=6) > aa_complete}
+        fa_from = self.cfg.get("meta_supermetrics_from")
+        prefer = set(range(wk(dt.date.fromisoformat(fa_from)), self.k + 1)) if fa_from else set()
+        targets = gap | prefer
+        fa_weeks = set()
+        if targets:
+            start = wstart(min(targets))
             try:
                 ds = sm.ensure_meta_daily(self.cfg["meta_fallback_accounts"], start.isoformat())
                 fa_complete = dt.date.fromisoformat(ds["end"]) - dt.timedelta(days=1)
                 fa = {}
                 for d, c, _a, cur, cost in ds["rows"]:
-                    day = dt.date.fromisoformat(d)
-                    kk = wk(day)
-                    if kk in covered:
+                    kk = wk(dt.date.fromisoformat(d))
+                    if kk in targets:
                         cad = cost * (1.0 if str(cur).upper() == "CAD" else self.spend_usd)
                         fa[(kk, str(c))] = fa.get((kk, str(c)), 0.0) + cad
-                for kk in list(covered):
-                    if wstart(kk) + dt.timedelta(days=6) <= fa_complete:
-                        for key in [x for x in spend if x[0] == kk]:
-                            spend.pop(key, None)
-                            clicks.pop(key, None)    # FA dataset has no clicks
-                        for (k2, c), v in fa.items():
-                            if k2 == kk:
-                                spend[(k2, c)] = v
-                        covered[kk] = True
-                        print(f"  [INFO] Meta spend for week {short_range(kk)} from Supermetrics "
-                              f"(ad_analytics complete through {aa_complete})")
+                for kk in sorted(targets):
+                    if wstart(kk) + dt.timedelta(days=6) > fa_complete:
+                        continue
+                    for key in [x for x in spend if x[0] == kk]:
+                        spend.pop(key, None)
+                        if kk in gap:
+                            clicks.pop(key, None)     # FA dataset has no clicks
+                    for (k2, c), v in fa.items():
+                        if k2 == kk:
+                            spend[(k2, c)] = v
+                    fa_weeks.add(kk)
+                self.fa_rows = ds["rows"]
+                print(f"  [INFO] Meta spend from Supermetrics Facebook Ads for {len(fa_weeks)} week(s) "
+                      f"from {wstart(min(fa_weeks)) if fa_weeks else '-'} (Facebook data through {fa_complete})")
             except Exception as exc:
-                self.warn(f"ad_analytics incomplete after {aa_complete} and Supermetrics Facebook "
-                          f"unavailable: {str(exc)[:120]}")
-        for kk, ok in covered.items():
-            if not ok and kk <= self.k:
-                self.warn(f"Meta spend for {short_range(kk)} is incomplete "
-                          f"(ad_analytics through {aa_complete})")
+                self.warn(f"Supermetrics Facebook Ads unavailable ({str(exc)[:120]}); "
+                          f"using ad_analytics (complete through {aa_complete})")
+        missing = {k for k in gap if k not in fa_weeks}
+        for kk in sorted(missing):
+            self.warn(f"Meta spend for {short_range(kk)} is incomplete (ad_analytics through {aa_complete})")
         self._meta = {"spend": spend, "clicks": clicks, "aa_complete": aa_complete,
-                      "missing": {k for k, ok in covered.items() if not ok}}
+                      "missing": missing, "fa_weeks": fa_weeks}
         print(f"  [INFO] Meta spend: ad_analytics complete through {aa_complete}")
         return self._meta
 
@@ -501,11 +507,9 @@ select st.adset_id adset, sum(if(c.account_name='facebook', aa.spend, aa.spend*{
 from ad_analytics aa join ads a on aa.ad_id = a.id join ad_sets st on a.ad_set_id = st.id
 join campaigns c on a.campaign_id = c.id
 where c.campaign_id in ({ids_sql(cids)}) and aa.date >= '{s}' and aa.date < '{e}' group by 1""", db=74)
-        if k in self.meta()["missing"]:
-            ds = sm.ensure_meta_daily(self.cfg["meta_fallback_accounts"], s.isoformat())
-            sp_rows = []
+        if k in self.meta()["fa_weeks"]:
             agg = {}
-            for d, c, a, cur, cost in ds["rows"]:
+            for d, c, a, cur, cost in self.fa_rows:
                 if str(c) in cids and s.isoformat() <= d < e.isoformat():
                     agg[str(a)] = agg.get(str(a), 0.0) + cost * (1.0 if str(cur).upper() == "CAD" else self.spend_usd)
             sp_rows = [{"adset": a, "cad": v} for a, v in agg.items()]
@@ -628,10 +632,7 @@ where {LIVE} and {where} and us.status = 1 group by 1""")
         out = []
         for label, seg in (("FB (Insurance)", "insurance"), ("FB (Financial)", "financial")):
             sp = self._sp(seg)
-            where = self.seg_where(seg)
-            tot = self.q(f"""select coalesce(sum({self.conv}),0) v from users u join financials f on f.user_id = u.id
-                where {LIVE} and ({where}) and f.gateway_transaction_type in {SUCC} and f.amount >= 1
-                  and u.created_at >= '{self.ws}' and u.created_at < '{self.we + dt.timedelta(days=1)}'""")[0]["v"]
+            tot = self.u(seg, k, "total")          # payments in the week by the segment's users
             imm = self.u(seg, k, "imm")
             out.append({"channel": label, "spend": money(sp), "revenue": money(_num(tot), 0, "-"),
                         "imm_return": pct(100 * imm / sp, 0) if (sp and imm) else "-",
