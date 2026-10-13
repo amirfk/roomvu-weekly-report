@@ -2,9 +2,10 @@ name: Weekly ROI Cohort Report
 
 on:
   schedule:
-    # Thursday 06:00 UTC. The Wed–Tue cohort week's W1 window is
-    # [cohort_start, cohort_start+8d); it only fully closes on the Thursday
-    # after the week ends, so the just-completed week's row appears then.
+    # Wednesday 15:00 UTC (11:00 ET): the Wed–Tue report week ended the day
+    # before and Facebook/Google have finalised Tuesday's spend by then.
+    - cron: '0 15 * * 3'
+    # Thursday 06:00 UTC refresh: same week, adds the W1 cohort grace day.
     - cron: '0 6 * * 4'
   workflow_dispatch:
 
