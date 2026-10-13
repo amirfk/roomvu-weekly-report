@@ -1,22 +1,21 @@
 # Numbers that are NOT in any data source the report can read, entered by hand
 # each week. Key = the report week's first day (Wednesday, YYYY-MM-DD).
-# Leave a value empty (null) and the slide shows "—" plus a reminder.
+# Empty (null) values show as "$-" / "-" in the Financial report.
 #
-#   tax_agents            Meta "Tax Agents" campaign — runs in an ad account that
-#                         Supermetrics/ad_analytics don't cover, and its sign-ups
-#                         carry no UTM tags.
-#   linkedin_registration LinkedIn sign-ups aren't UTM-tagged in our users table.
-#   linkedin_retargeting
-#   openai_spend          ChatGPT/Open AI ads spend (Financial report "Tests" row).
+#   linkedin_spend / linkedin_registrations  Financial report "LinkedIn" row
+#                                            (LinkedIn sign-ups carry no UTM tags).
+#   openai_spend                             ChatGPT / Open AI ads spend, part of the
+#                                            Financial report "Tests" row.
+# Tax Agents / LinkedIn slides are hidden (as in the team's deck); to show them,
+# set hidden: false in report.yaml and add tax_agents / linkedin_registration /
+# linkedin_retargeting values here.
 
-"2026-09-30":                       # from the team's Oct 8 deck
-  tax_agents: {registrations: 27, cost: 360, cpa: 13, subscriptions: 0, im_revenue: 0}
-  linkedin_registration: {registrations: 7, cost: 423, cpa: 60, im_revenue: 0, total_revenue: 273}
-  linkedin_retargeting: {clicks: 13, cost: 141, cpc: 10.8, im_revenue: 0, total_revenue: 364}
+"2026-09-30":
+  linkedin_spend: null
+  linkedin_registrations: null
   openai_spend: null
 
 "2026-10-07":
-  tax_agents: {registrations: null, cost: null, cpa: null, subscriptions: null, im_revenue: null}
-  linkedin_registration: {registrations: null, cost: null, cpa: null, im_revenue: null, total_revenue: null}
-  linkedin_retargeting: {clicks: null, cost: null, cpc: null, im_revenue: null, total_revenue: null}
+  linkedin_spend: null
+  linkedin_registrations: null
   openai_spend: null

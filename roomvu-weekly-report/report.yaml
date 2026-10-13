@@ -140,16 +140,16 @@ slides:
     title: "Meta - Real Estate & MB"
     icon: meta
     charts:
-      - {title: "Meta Spending", since: "2026-01-07", format: currency,
+      - {title: "Meta Spending", since: "2025-12-31", format: currency,
          series: [{label: "Meta Spending", metric: spend, segment: re_mb_meta}]}
 
   - type: charts
     title: "Meta - Real Estate & MB"
     icon: meta
     charts:
-      - {title: "Total Return Rate", since: "2026-01-07", format: percent, decimals: 2,
+      - {title: "Total Return Rate", since: "2025-12-31", format: percent, decimals: 2,
          series: [{label: "Total Return Rate", metric: return_rate, revenue_segment: re_mb_meta_revenue, segment: re_mb_meta}]}
-      - {title: "Subscription Rate", since: "2026-01-07", format: percent, decimals: 2,
+      - {title: "Subscription Rate", since: "2025-12-31", format: percent, decimals: 2,
          series: [{label: "Subscription Rate", metric: sub_rate, segment: re_mb_meta}]}
 
   - type: kpi_chart
@@ -158,7 +158,7 @@ slides:
     kpis:
       - {label: Registrations, metric: regs, segment: realtor}
       - {label: Cost, metric: spend, segment: realtor}
-    chart: {title: "CPA", since: "2025-09-10", format: currency,
+    chart: {title: "CPA", since: "2025-09-03", format: currency,
             series: [{label: CPA, metric: cpa, segment: realtor}]}
 
   - type: kpi_chart
@@ -167,7 +167,7 @@ slides:
     kpis:
       - {label: "RV Registration Revenue", metric: imm, segment: realtor}
       - {label: "Total Revenue", metric: revenue, segment: re_mb_meta_revenue}
-    chart: {title: "Immediate return rate", since: "2026-01-07", format: percent, decimals: 0,
+    chart: {title: "Immediate return rate", since: "2025-12-31", format: percent, decimals: 0,
             series: [{label: "Immediate return rate", metric: imm_rate, segment: realtor}]}
 
   - type: regions
@@ -225,16 +225,16 @@ slides:
     title: "Meta - Insurance Agents Spend"
     icon: meta
     charts:
-      - {title: "Weekly Spend", since: "2025-04-16", format: currency,
+      - {title: "Weekly Spend", since: "2025-04-16", format: currency, label_style: range,
          series: [{label: "Weekly Spend", metric: spend, segment: insurance}]}
 
   - type: charts
     title: "Meta - Insurance Agents CPA & Register - Weekly"
     icon: meta
     charts:
-      - {title: "Registrations", since: "2025-11-05", format: number, color: "#e8956d",
+      - {title: "Registrations", since: "2025-11-05", format: number, color: "#e8956d", label_style: range,
          series: [{label: Registrations, metric: regs, segment: insurance}]}
-      - {title: "CPA", since: "2025-11-05", format: currency, color: "#e8c84a",
+      - {title: "CPA", since: "2025-11-05", format: currency, color: "#e8c84a", label_style: range,
          series: [{label: CPA, metric: cpa, segment: insurance}]}
 
   - type: kpi
@@ -257,15 +257,17 @@ slides:
     rows: 5
 
   - type: manual_kpi             # campaign isn't in our ad accounts / users table
+    hidden: true                 # hidden in the team's deck
     title: "Meta - Tax Agents Registration"
     icon: meta
     creative: creative_tax.jpg
     key: tax_agents
     kpis: [Registrations, Cost, CPA, Subscriptions, "Im. Revenue"]
 
-  - {type: section, title: Linkedin}
+  - {type: section, title: Linkedin, hidden: true}   # hidden in the team's deck
 
   - type: manual_kpi
+    hidden: true                 # hidden in the team's deck
     title: "Linkedin - Registration"
     icon: linkedin
     creative: creative_linkedin_reg.jpg
@@ -273,6 +275,7 @@ slides:
     kpis: [Registrations, Cost, CPA, "Im. Revenue", "Total Revenue"]
 
   - type: manual_kpi
+    hidden: true                 # hidden in the team's deck
     title: "Linkedin - Retargeting"
     icon: linkedin
     creative: creative_linkedin_rt.jpg
@@ -285,9 +288,9 @@ slides:
     title: "Google - All campaigns"
     icon: google
     charts:
-      - {title: "Google Total Spending", since: "2025-12-31", format: currency,
+      - {title: "Google Total Spending", since: "2025-12-24", format: currency,
          series: [{label: "Google Total Spending", metric: spend, segment: google_all}]}
-      - {title: "Google CPA", since: "2025-12-31", format: currency, decimals: 2,
+      - {title: "Google CPA", since: "2025-12-24", format: currency, decimals: 2,
          series: [{label: "Google CPA", metric: cpa, segment: google_all}]}
 
   - type: charts
@@ -295,9 +298,9 @@ slides:
     icon: google
     note: "Total Return Rate = all Google users' payments that week (Metabase Q8475: raw amounts) ÷ acquisition spend (PPC Social, PPC Video, Competitors). Immediate Revenue Rate = same-week subscription revenue from that week's Google registrants ÷ total Google spend."
     charts:
-      - {title: "Total Return Rate", since: "2025-12-31", format: percent, decimals: 2,
+      - {title: "Total Return Rate", since: "2025-12-24", format: percent, decimals: 2,
          series: [{label: "Total Return Rate", metric: raw_return_rate, revenue_segment: google_all, segment: google_acq}]}
-      - {title: "Immediate Revenue Rate", since: "2025-12-31", format: percent, decimals: 1,
+      - {title: "Immediate Revenue Rate", since: "2025-12-24", format: percent, decimals: 1,
          series: [{label: "Immediate Revenue Rate", metric: imm_rate, segment: google_all}]}
 
   - type: kpi
@@ -341,12 +344,12 @@ slides:
     title: "Meta & Google – Real Estate & MB"
     layout: triple
     charts:
-      - {title: "", since: "2026-01-14", format: currency,
+      - {title: "", since: "2026-01-07", format: currency,
          series: [{label: "Total Spending", metric: spend, segment: re_mb_all, color: "#4285f4"},
                   {label: "Total Revenue", metric: revenue, segment: re_mb_all_revenue, color: "#ea4335"}]}
-      - {title: "Registrations", since: "2026-01-14", format: number,
+      - {title: "Registrations", since: "2026-01-07", format: number,
          series: [{label: Registrations, metric: regs, segment: re_mb_all}]}
-      - {title: "Imm. Return Rate", since: "2026-01-14", format: percent, decimals: 2,
+      - {title: "Imm. Return Rate", since: "2026-01-07", format: percent, decimals: 2,
          series: [{label: "Imm. Return Rate", metric: imm_rate, segment: re_mb_all}]}
 
   - type: fin_re

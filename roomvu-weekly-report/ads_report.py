@@ -47,8 +47,10 @@ def ids_sql(xs):
 
 
 def week_label(k):
-    s = wstart(k)
-    return f"{MONTHS[s.month - 1]} W{(s.day - 1) // 7 + 1}"
+    """Manual-deck convention: a week is named by its LAST day (Tuesday),
+    e.g. 30 Sep - 6 Oct = "Oct W1", 24 Dec - 30 Dec = "Dec W5"."""
+    e = wstart(k) + dt.timedelta(days=6)
+    return f"{MONTHS[e.month - 1]} W{(e.day - 1) // 7 + 1}"
 
 
 def short_range(k):
@@ -383,7 +385,8 @@ group by 1""")
             ks.pop()
             for sr in series:
                 sr["data"].pop()
-        return {"title": c.get("title", ""), "labels": [week_label(k) for k in ks],
+        lab = short_range if c.get("label_style") == "range" else week_label
+        return {"title": c.get("title", ""), "labels": [lab(k) for k in ks],
                 "series": series, "format": c.get("format", "number"),
                 "decimals": c.get("decimals", 0 if c.get("format") != "percent" else 2)}
 
@@ -599,7 +602,7 @@ where {LIVE} and {where} and us.status = 1 group by 1""")
 
     def b_fin_re(self, s):
         k = self.k
-        li = self.manual.get("linkedin_registration") or {}
+        li = {"cost": self.manual.get("linkedin_spend"), "registrations": self.manual.get("linkedin_registrations")}
         openai = _num(self.manual.get("openai_spend"))
         chat = self.q(f"""select count(*) n from users u where {LIVE} and u.utm_source in ('chatgpt','chatgpt.com')
             and u.created_at >= '{self.ws}' and u.created_at < '{self.we + dt.timedelta(days=1)}'""")[0]["n"]
@@ -621,8 +624,6 @@ where {LIVE} and {where} and us.status = 1 group by 1""")
         f = {key: {"spend": money(v[0]), "reg": count(v[1]) if v[1] is not None else "-"} for key, v in rows.items()}
         if openai is None:
             self.warn("Financial report RE&MB: Open AI test spend not provided (manual_inputs.yaml: openai_spend)")
-        if li.get("cost") is None:
-            self.warn("Financial report RE&MB: LinkedIn spend not provided (manual_inputs.yaml)")
         return {"type": "fin_re", "r": f, "total_spend": money(total_spend), "revenue": money(revenue),
                 "imm_return": pct(100 * imm / total_spend if total_spend else None),
                 "total_reg": count(total_reg)}
