@@ -372,5 +372,28 @@
 "Cost": 0
 }
 ]
+},
+"1bc485210bde4404": {
+"fetched_at": "2026-11-04T21:13Z",
+"date_range_type": "last_year_inc",
+"start": "2026-10-28",
+"end": "2026-11-03",
+"rows": [
+{
+"Campaignid": "11179321084",
+"Clicks": 305,
+"Cost": 539.075
+},
+{
+"Campaignid": "20853114375",
+"Clicks": 110,
+"Cost": 437.0874
+},
+{
+"Campaignid": "17948075953",
+"Clicks": 6,
+"Cost": 27.8868
+}
+]
 }
 }
